@@ -16,9 +16,9 @@ This is Fable-tier work. Do it well, and do it once. Read `${CLAUDE_PLUGIN_ROOT}
 
 1. **Understand the request.** If the task is empty, ask the user what they want. If it is ambiguous in a way that changes the plan materially, ask now, before anything is dispatched. Routine calls are made here and recorded in the plan as decisions.
 
-2. **Gather context cheaply.** Do not read the codebase directly. Dispatch one or more `fable-lite:scout` agents in parallel with specific questions: where the affected code lives, what conventions apply, which file is the best exemplar for each pattern the plan will need, and what the test and typecheck commands are. Read only the files scout names as essential.
+2. **Gather context cheaply.** Do not read the codebase directly. Dispatch **one** `fable-lite:scout` with a numbered list of every question, not one scout per question. Add a second scout only if the first answer opens an area the first could not have covered. Questions to include: where the affected code lives, what conventions apply, which file is the best exemplar for each pattern the plan will need, and what the test and typecheck commands are. Read only the files scout names as essential.
 
-3. **Decompose.** Break the task into work items. Each item is something a single agent can finish from one brief in one sitting. Split anything that would need a brief longer than a page.
+3. **Decompose, then merge.** Break the task into work items. Each item is something a single agent can finish from one brief in one sitting. Then merge: items that share a tier and touch the same area become one item with numbered steps. Target two to five items. Split only when a brief would exceed a page or when a design decision sits between two halves. Every agent spawn pays full orientation overhead, so fewer, fuller briefs win.
 
 4. **Score and tag.** Score each item with the rubric. Tag it `[SONNET]`, `[OPUS]`, or `[FABLE]`. Items tagged `[FABLE]` should be rare: usually they are a design decision Fable makes now, which then unlocks Opus or Sonnet items. Make those decisions in this step and write them down.
 

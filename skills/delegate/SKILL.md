@@ -18,7 +18,7 @@ Use this for one-off work that does not need a plan file: a fix, a small feature
 
 2. **Score the task** with `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/routing-rubric.md` unless a tier was forced. If the score says the task is too big or too ambiguous to delegate as one item, say so and suggest `/fable-lite:plan` instead. If it is ambiguous in a way only the user can resolve, ask.
 
-3. **Gather what the brief needs.** If you do not already know the target files, the exemplar, or the test command, dispatch `fable-lite:scout` with a precise question. Do not browse the codebase yourself.
+3. **Gather what the brief needs.** If you do not already know the target files, the exemplar, or the test command, dispatch one `fable-lite:scout` with every question in a single list. For a single grep or one file read, just do it here; an agent is not worth it for a one-line lookup.
 
 4. **Write the full brief** from `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md`. Every section filled.
 
@@ -29,7 +29,7 @@ Use this for one-off work that does not need a plan file: a fix, a small feature
 
 6. **Audit** with `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/audit-checklist.md`. Send back once with a precise fix brief if needed; escalate one tier on a second miss.
 
-7. **Verify** by dispatching `fable-lite:verifier` if the change touches tested code and the implementer's own verification was partial.
+7. **Verify** only if needed: the implementer already ran its checks. Dispatch `fable-lite:verifier` when the change touches tested code and the implementer's verification was partial or the suite is too long to run here.
 
 8. **Report**: one line on the route taken and why, the files changed, the verification outcome, and anything the agent flagged as an observation.
 

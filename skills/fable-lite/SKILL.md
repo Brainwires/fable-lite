@@ -66,6 +66,17 @@ When unsure between Sonnet and Opus, score the item with `references/routing-rub
 
 Subagents start with an empty context. They do not know what the user said, what Fable read, or what was decided. A brief that assumes shared context produces a wrong result and a retry, which costs more than writing the brief properly. Every brief carries: goal, exact files, an exemplar when one exists, explicit scope boundaries, the definition of done, and the required report format. The template in `references/brief-template.md` is the minimum.
 
+## Agent budget: batch, don't sprawl
+
+Every subagent spawn has a fixed cost before any work happens: it reads CLAUDE.md, orients in the repo, and re-discovers conventions. Ten small agents cost far more than two well-briefed ones doing the same work. Rules:
+
+- **One scout per plan, not one per question.** Give the scout a numbered list of everything Fable needs to know. Dispatch a second scout only if the first answer opens a new area.
+- **Merge items that share a tier and a neighborhood.** Three Sonnet edits in the same package are one brief with three numbered steps, not three agents.
+- **Aim for two to five items per plan.** A plan with ten items is usually a plan with three items that were split too finely. A single brief may run up to a page.
+- **Verify once, at the end.** Implementers already run their own checks. Dispatch `verifier` for the baseline (only when the suite is not trivially fast to run in-session) and once after the last item. Not after every item.
+- **Do not dispatch an agent for a one-line lookup.** A single grep or a single file read is cheaper done here than briefed.
+- **Parallel is not free.** Run independent items in parallel to save wall-clock time, but do not create parallelism by splitting work that one agent could do sequentially.
+
 ## Escalation
 
 - `sonnet-implementer` returns BLOCKED or fails audit twice: re-brief to `opus-implementer`.

@@ -20,7 +20,7 @@ If there is no plan, tell the user and stop.
 
 Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/audit-checklist.md`. Then, for each wave in order:
 
-1. **Baseline once.** Before the first wave, if the plan lists a test command and no baseline is recorded, dispatch `fable-lite:verifier` to run it and note the result in the plan under Context as `Baseline: GREEN|RED (<summary>)`.
+1. **Baseline once, if it earns its keep.** Before the first wave, if the plan lists a test command and no baseline is recorded: run it directly here when it is fast (under a minute, short output), otherwise dispatch `fable-lite:verifier`. Note the result in the plan under Context as `Baseline: GREEN|RED (<summary>)`.
 
 2. **Brief every item in the wave.** Expand each item's short brief into the full template. Include the plan's Decisions and Context sections verbatim where relevant. The agent has no other context. Set status to `in-progress` in the plan file.
 
@@ -38,7 +38,7 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
 
 5. **Between waves**, re-read `git diff --stat`. If items in the wave changed the assumptions of later items, update those briefs before dispatching.
 
-6. **After the last wave**, dispatch `fable-lite:verifier` for the full relevant suite. If red, treat the failures as new items: brief and route them.
+6. **After the last wave**, dispatch `fable-lite:verifier` once for the full relevant suite. Do not dispatch a verifier per item; implementers run their own targeted checks and the audit reads their output. If red, batch all failures into one fix brief where they share a cause or area, and route it.
 
 7. **Report to the user.** What changed (files, one line each), what was verified and how, anything blocked or skipped, and the routing summary: how many items ran on Sonnet, Opus, and Fable, and how many were escalated.
 
@@ -47,3 +47,4 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
 - Never commit or push. The user decides that.
 - Do not implement a `[SONNET]` or `[OPUS]` item yourself because it looks quick. That is the exact cost this plugin exists to avoid. Brief it.
 - Do read every diff you accept. Delegation without audit is not cheaper, it is deferred.
+- Do not multiply agents. A send-back goes to the same agent with a short fix brief. If two items in a wave turn out to be tightly coupled, merge them into one brief before dispatch instead of running two agents that will step on each other.

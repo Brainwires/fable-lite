@@ -123,6 +123,16 @@ Hard overrides: blast radius 2 means Fable designs the change and audits line by
 
 The full rubric with worked examples is in `skills/fable-lite/references/routing-rubric.md`.
 
+## Agent budget: batch, don't sprawl
+
+Subagents are cheaper per token than Fable, but each spawn pays a fixed orientation cost: reading CLAUDE.md, finding its way around the repo, re-learning conventions. Ten small agents cost far more than two well-briefed ones. The plugin is written to keep the count down:
+
+- One scout per plan, carrying a numbered list of every question, not one scout per question
+- Items that share a tier and a neighborhood are merged into one brief with numbered steps; two to five items per plan is the target
+- Verification runs once at the end, not after every item; implementers already run their own targeted checks
+- A single grep or file read is done in-session, never briefed
+- Parallelism is used for genuinely independent items, never manufactured by splitting one agent's work into several
+
 ## What stays on Fable, always
 
 - Understanding the request and resolving ambiguity with you

@@ -24,6 +24,8 @@ Score each work item on five axes, 0 to 2 each. Sum the score.
 - Spec clarity 2 → not delegable yet. Resolve the ambiguity first (ask the user, or dispatch `scout` for the missing context), then rescore.
 - Judgment 2 → Fable makes the decision, records it in the brief, then rescores. Usually drops to Opus.
 
+**Batching.** Splitting is for reducing risk and ambiguity, not for creating agents. After scoring, merge adjacent items that land on the same tier and touch the same area into one brief with numbered steps. Two to five items per plan is the target. Every extra agent pays the full orientation overhead again.
+
 **Splitting.** A high score usually means the item is really several items. Split along file or layer boundaries until each piece scores in the delegable range. Sequence pieces that depend on each other. Most "Fable-only" items become one Fable design step plus two or three Opus or Sonnet items.
 
 **Worked examples:**
