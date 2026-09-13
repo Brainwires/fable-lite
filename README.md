@@ -1,0 +1,198 @@
+# fable-lite
+
+**Spend Fable where it matters.**
+
+A Claude Code plugin that keeps your Fable session on the work that needs a top-tier model (understanding, planning, design decisions, risky changes, and auditing) and routes everything else to Opus or Sonnet subagents chosen by complexity.
+
+Most tokens in a coding session go to work that does not need the best model: finding files, typing out a change whose shape is already decided, running tests, updating docs. fable-lite turns that observation into a discipline, with commands and agents that make the cheap path the easy path.
+
+## How it works
+
+```
+                      ┌──────────────────────────────────────────┐
+  you ──────────────► │  Fable session (orchestrator)            │
+                      │  understand · plan · decide · brief      │
+                      │  audit every result · integrate · report │
+                      └───┬─────────┬──────────┬───────────┬─────┘
+                          │         │          │           │
+                     read-only   small &    multi-file   run tests
+                     questions   mechanical  judgment    lint, build
+                          │         │          │           │
+                          ▼         ▼          ▼           ▼
+                       scout    sonnet-     opus-       verifier
+                      (Sonnet)  implementer implementer (Sonnet)
+                                (Sonnet)    (Opus)
+```
+
+1. **Fable understands the request** and asks scouts for the context it needs instead of reading the codebase itself.
+2. **Fable decomposes the work** into items and scores each one on a five-axis rubric (files touched, exemplar exists, judgment required, blast radius, spec clarity). The score picks the tier.
+3. **Fable writes a self-contained brief per item** and dispatches independent items in parallel.
+4. **Fable audits every diff** that comes back. Accept, send back with a precise fix brief, or take over. Two misses escalate one tier.
+5. **A verifier runs the suite** and Fable reports to you: what changed, what was verified, what ran where.
+
+The routing rule in one line: **if a competent engineer could do it from a ten-line brief without asking a question, Fable should not be the one doing it.**
+
+## Install
+
+From GitHub (recommended):
+
+```
+/plugin marketplace add Brainwires/fable-lite
+/plugin install fable-lite@fable-lite
+```
+
+From a local clone:
+
+```
+git clone https://github.com/Brainwires/fable-lite.git
+/plugin marketplace add ./fable-lite
+/plugin install fable-lite@fable-lite
+```
+
+Try it without installing:
+
+```
+claude --plugin-dir ./fable-lite
+```
+
+Restart Claude Code (or start a new session) after installing. You should see a short `[fable-lite]` routing reminder at session start.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/fable-lite:plan <task>` | Fable decomposes the task, tags each item `[SONNET]`, `[OPUS]`, or `[FABLE]`, records design decisions, and writes `.fable-lite/plan.md`. Does not build. |
+| `/fable-lite:build [items]` | Executes the plan wave by wave. Briefs and dispatches each item to its tier, audits every result on Fable, updates status in the plan file, runs the verifier at the end. |
+| `/fable-lite:delegate <task> [--sonnet\|--opus\|--fable]` | One-off. Scores the task, briefs it, dispatches, audits, reports. Force a tier with a flag. |
+| `/fable-lite:audit [diff-target]` | Fable-tier review of the working tree (or a git diff target) against the audit checklist, with the verifier. Reports only; changes nothing. |
+| `/fable-lite:help` | Prints the routing rule, commands, and agents. |
+
+### Typical session
+
+```
+> /fable-lite:plan add rate limiting to the public API, 100 req/min per key
+
+  Fable dispatches two scouts (where middleware lives, what the test setup is),
+  decides token bucket over sliding window, writes a 4-item plan:
+    1. [SONNET] add RATE_LIMIT_* settings with defaults
+    2. [OPUS]   token-bucket middleware + unit tests        (depends on 1)
+    3. [SONNET] register middleware on the public router     (depends on 2)
+    4. [FABLE]  audit the 429 path and header contract, full suite
+
+> /fable-lite:build
+
+  Wave 1: item 1 → Sonnet. Audited, accepted.
+  Wave 2: item 2 → Opus. Audited, sent back once (missing test for burst reset), accepted.
+  Wave 3: item 3 → Sonnet. Audited, accepted.
+  Wave 4: item 4 on Fable. Verifier: GREEN, 212 passed.
+  Routing: Sonnet 2 · Opus 1 · Fable 1 · escalations 0
+```
+
+## Agents
+
+All four are available to the Agent tool as `fable-lite:<name>` and are used automatically by the commands. You can also call them directly in conversation ("use the fable-lite scout to find every caller of `parseConfig`").
+
+| Agent | Model | Tools | Use for |
+|---|---|---|---|
+| `scout` | Sonnet | read-only | "Where is…", "list all…", "how does X work", "find the best exemplar for…" |
+| `sonnet-implementer` | Sonnet | full | Single-file edits, pattern copies with a named exemplar, renames, config, docs |
+| `opus-implementer` | Opus | full | Multi-file features with a defined interface, refactors under test, known-cause bug fixes, test authoring |
+| `verifier` | Sonnet | read-only | Run tests / typecheck / lint / build, report faithfully with verbatim failure tails |
+
+Implementers work from a brief, stay inside its scope, never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations, observations) so Fable can audit from the diff plus a short summary rather than a transcript. If a brief conflicts with the code, they stop and report instead of improvising.
+
+## The routing rubric
+
+Each work item is scored 0 to 2 on five axes and summed:
+
+| Axis | 0 | 1 | 2 |
+|---|---|---|---|
+| Files touched | one | two to four | five or more, or unknown |
+| Exemplar exists | yes, nameable | partial | none, novel shape |
+| Judgment required | none | small choices inside a fixed interface | interface or approach undecided |
+| Blast radius | local, private | shared code or public function | auth, data, money, deletion, concurrency, migrations, public API |
+| Spec clarity | fully specified | one or two routine calls | ambiguous |
+
+| Total | Route |
+|---|---|
+| 0 to 3 | `sonnet-implementer` |
+| 4 to 6 | `opus-implementer` |
+| 7 to 10 | Fable, or split the item until the pieces score lower |
+
+Hard overrides: blast radius 2 means Fable designs the change and audits line by line regardless. Spec clarity 2 means it is not delegable until the ambiguity is resolved. Judgment 2 means Fable makes the decision first, writes it into the brief, then rescores (which usually lands on Opus).
+
+The full rubric with worked examples is in `skills/fable-lite/references/routing-rubric.md`.
+
+## What stays on Fable, always
+
+- Understanding the request and resolving ambiguity with you
+- Decomposition, sequencing, architecture, naming public things
+- Anything touching auth, secrets, payments, migrations, deletion, concurrency, or public API contracts
+- Debugging when the root cause is unknown
+- Auditing every delegated result before it is accepted
+- Final integration and the summary you read
+
+Delegation without audit is not cheaper, it is deferred. Fable reads every diff it accepts.
+
+## The skill, without the commands
+
+The `fable-lite` skill also loads automatically when you ask for implementation work in a normal conversation. It applies the same routing rule inline: scout for context, brief and dispatch the implementable parts, audit, verify, report. The commands are the structured version of the same loop, useful when the work is big enough to want a plan file.
+
+## Files this plugin creates in your project
+
+- `.fable-lite/plan.md` — the current plan, written by `/fable-lite:plan`, updated by `/fable-lite:build`. Add `.fable-lite/` to your `.gitignore` if you do not want plans committed.
+
+## Configuration
+
+| Setting | Effect |
+|---|---|
+| `FABLE_LITE_QUIET=1` | Suppress the session-start routing reminder. |
+| Agent `model` override | The agents pin `opus` and `sonnet` in their frontmatter. Pass `model` on an Agent call for a one-off override, or edit `agents/*.md` in your local copy to change the defaults (for example, `haiku` for scout). |
+
+## Layout
+
+```
+fable-lite/
+├── .claude-plugin/
+│   ├── plugin.json           # plugin manifest
+│   └── marketplace.json      # lets this repo be added as a marketplace
+├── agents/
+│   ├── scout.md              # Sonnet, read-only
+│   ├── sonnet-implementer.md # Sonnet
+│   ├── opus-implementer.md   # Opus
+│   └── verifier.md           # Sonnet, read-only
+├── skills/
+│   ├── fable-lite/           # auto-loading routing skill
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       ├── routing-rubric.md
+│   │       ├── brief-template.md
+│   │       └── audit-checklist.md
+│   ├── plan/SKILL.md         # /fable-lite:plan
+│   ├── build/SKILL.md        # /fable-lite:build
+│   ├── delegate/SKILL.md     # /fable-lite:delegate
+│   ├── audit/SKILL.md        # /fable-lite:audit
+│   └── help/SKILL.md         # /fable-lite:help
+├── hooks/
+│   ├── hooks.json            # SessionStart reminder
+│   └── session-start.sh
+├── README.md
+└── LICENSE
+```
+
+## Why not just use a cheaper model for the whole session?
+
+Because the expensive parts of a task are exactly the parts where model quality shows: noticing the ambiguity before it becomes a wrong implementation, choosing the design that will not need to be redone, and catching the subtle bug in review. Running those on a cheaper model saves tokens and costs rework. Running the mechanical parts on Fable costs tokens and saves nothing. fable-lite is the split that keeps both sides honest.
+
+## Requirements
+
+- Claude Code 2.1 or later (plugin skills, namespaced agents, `${CLAUDE_PLUGIN_ROOT}`)
+- A session model worth protecting. The plugin works on any session model, but the savings come from running the orchestrator on Fable.
+
+## Contributing
+
+Issues and pull requests welcome. Keep the agents' report formats stable: the audit checklist and build loop depend on them.
+
+## License
+
+MIT

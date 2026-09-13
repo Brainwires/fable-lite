@@ -1,0 +1,21 @@
+{
+  "name": "fable-lite",
+  "version": "0.1.0",
+  "description": "Spend Fable where it matters. Keeps planning, judgment calls, and auditing on the Fable session while routing well-specified implementation work to Opus or Sonnet subagents by complexity.",
+  "author": {
+    "name": "Brainwires"
+  },
+  "repository": "https://github.com/Brainwires/fable-lite",
+  "license": "MIT",
+  "keywords": [
+    "orchestration",
+    "delegation",
+    "subagents",
+    "cost",
+    "fable",
+    "opus",
+    "sonnet",
+    "planning",
+    "audit"
+  ]
+}

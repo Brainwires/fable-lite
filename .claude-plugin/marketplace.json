@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fable-lite",
+  "description": "Marketplace for the fable-lite plugin: Fable plans and audits, Opus and Sonnet subagents implement.",
+  "owner": {
+    "name": "Brainwires"
+  },
+  "plugins": [
+    {
+      "name": "fable-lite",
+      "description": "Spend Fable where it matters. Keeps planning, judgment calls, and auditing on the Fable session while routing well-specified implementation work to Opus or Sonnet subagents by complexity.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Brainwires"
+      },
+      "category": "productivity",
+      "source": "./"
+    }
+  ]
+}
