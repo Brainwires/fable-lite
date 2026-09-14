@@ -20,6 +20,12 @@ One or two sentences. What should be true when you are done.
 - Exemplar: path/model.ext — copy this shape / follow this pattern
 - Do NOT touch: path/other.ext, anything under dir/
 
+## Steps (required for Sonnet-tier, recommended for Opus-tier)
+1. In path/one.ext, <do exactly this>
+2. In path/two.ext, <do exactly this>
+3. Run `<command>`
+Typed, numbered, literal. Each step is a mechanical action, not a goal. If a step cannot be written this way, the design is not finished and the item is not ready to delegate.
+
 ## Exact change
 Be as specific as the work allows. Signatures, names, behavior, error handling, edge cases. If you already know the diff, describe it. If a design decision has been made, state it as a fact, not an option.
 
@@ -71,6 +77,10 @@ Declare `jsonOut bool` via `fs.BoolVar(&jsonOut, "json", false, "output as JSON"
 ## Report
 Use the report format from your agent instructions.
 ```
+
+## The handoff rule
+
+The cheap model is not asked to design. It is asked to type. A Sonnet-tier brief should read like a diff described in prose, with numbered steps; if writing the steps requires a decision, make the decision first, then write the steps. When an implementer comes back having redesigned something, the fix is not a smarter model, it is a more literal brief: re-send the same item to the same tier as typed steps only. Escalate a tier only when typed steps also fail.
 
 ## Dispatch notes
 

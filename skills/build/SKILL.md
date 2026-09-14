@@ -33,6 +33,7 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
 4. **Audit each result as it arrives.** Follow the audit checklist. Read the diff, not the transcript. Then:
    - Accept → set status `done`
    - Send back → write a fix brief quoting the exact miss, re-dispatch to the same agent. Second miss on the same item escalates one tier (Sonnet → Opus → Fable).
+   - Redesigned instead of followed the brief → do not escalate. Re-dispatch to the same tier with a typed, numbered Steps section only. Escalate only if that also fails.
    - Take over → fix it here, set status `done`, note "completed on Fable" in the item
    - Agent reports BLOCKED with a real conflict → set status `blocked`, record the conflict, and decide: adjust the plan, or ask the user if the decision is theirs
 

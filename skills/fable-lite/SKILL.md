@@ -64,7 +64,7 @@ When unsure between Sonnet and Opus, score the item with `references/routing-rub
 
 ## Briefs are the whole game
 
-Subagents start with an empty context. They do not know what the user said, what Fable read, or what was decided. A brief that assumes shared context produces a wrong result and a retry, which costs more than writing the brief properly. Every brief carries: goal, exact files, an exemplar when one exists, explicit scope boundaries, the definition of done, and the required report format. The template in `references/brief-template.md` is the minimum.
+Subagents start with an empty context. They do not know what the user said, what Fable read, or what was decided. A brief that assumes shared context produces a wrong result and a retry, which costs more than writing the brief properly. Every brief carries: goal, exact files, an exemplar when one exists, typed numbered steps for Sonnet-tier work, explicit scope boundaries, the definition of done, and the required report format. The cheap model is asked to type, not to design; if the steps cannot be written without making a decision, make the decision first. The template in `references/brief-template.md` is the minimum.
 
 ## Agent budget: batch, don't sprawl
 
@@ -79,6 +79,7 @@ Every subagent spawn has a fixed cost before any work happens: it reads CLAUDE.m
 
 ## Escalation
 
+- Any implementer redesigns instead of following the brief: re-brief the **same** tier as typed, numbered steps. Redesign means the brief left a decision open. Escalate only if typed steps also fail.
 - `sonnet-implementer` returns BLOCKED or fails audit twice: re-brief to `opus-implementer`.
 - `opus-implementer` returns BLOCKED or fails audit twice: Fable takes the item over.
 - Any agent reports a conflict between the brief and the code: Fable decides. Do not re-dispatch the same brief.

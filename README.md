@@ -99,7 +99,7 @@ All four are available to the Agent tool as `fable-lite:<name>` and are used aut
 | `opus-implementer` | Opus | full | Multi-file features with a defined interface, refactors under test, known-cause bug fixes, test authoring |
 | `verifier` | Sonnet | read-only | Run tests / typecheck / lint / build, report faithfully with verbatim failure tails |
 
-Implementers work from a brief, stay inside its scope, never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations, observations) so Fable can audit from the diff plus a short summary rather than a transcript. If a brief conflicts with the code, they stop and report instead of improvising.
+Implementers work from a brief, stay inside its scope, never redesign (Sonnet reports BLOCKED the moment it would have to choose an approach; Opus may make small choices inside the fixed interface and must list them), never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations, observations) so Fable can audit from the diff plus a short summary rather than a transcript. If a brief conflicts with the code, they stop and report instead of improvising.
 
 ## The routing rubric
 
@@ -122,6 +122,10 @@ Each work item is scored 0 to 2 on five axes and summed:
 Hard overrides: blast radius 2 means Fable designs the change and audits line by line regardless. Spec clarity 2 means it is not delegable until the ambiguity is resolved. Judgment 2 means Fable makes the decision first, writes it into the brief, then rescores (which usually lands on Opus).
 
 The full rubric with worked examples is in `skills/fable-lite/references/routing-rubric.md`.
+
+## The handoff rule: typed steps, not goals
+
+The cheap model is asked to type, not to design. A Sonnet-tier brief carries a numbered Steps section that reads like a diff described in prose. If a step cannot be written without making a decision, the design is not finished and the item is not ready to delegate. When an implementer comes back having redesigned something, the plugin does not escalate to a smarter model; it re-sends the same item to the same tier as literal typed steps. Redesign is a brief-clarity failure, not a capability failure. Escalation happens only when typed steps also fail.
 
 ## Agent budget: batch, don't sprawl
 

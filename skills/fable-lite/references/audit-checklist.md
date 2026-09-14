@@ -18,6 +18,7 @@ For worktree-isolated agents, diff inside the worktree path the result names.
 - [ ] No file outside the brief was touched. If one was, is the reason in "Deviations" and is it acceptable?
 - [ ] "Do NOT touch" was honored
 - [ ] The "Exact change" section matches what landed: names, signatures, behavior, error handling
+- [ ] **No redesign.** The agent implemented the approach in the brief, not a different one. Check "Design choices I made" / "Decisions made" in the report and compare the diff's shape to the exemplar. A redesign is a send-back even when the new design is fine: it was not audited, and it teaches nothing about whether the brief was clear.
 - [ ] Definition of done: the report shows the commands were run and passed. If in doubt, dispatch `verifier` rather than trusting the claim.
 
 ## 3. Check the code itself
@@ -42,6 +43,7 @@ Fable reads the diff as a reviewer would:
 
 - **Accept.** Move on. Note the item done in the plan.
 - **Send back.** Write a short fix brief that quotes the specific problem and the specific expected behavior. Same agent if the miss was small and mechanical; escalate one tier if it was a judgment miss. Two send-backs on the same item means escalate regardless.
+- **Yank back to typed steps.** If the miss was a redesign (the agent chose an approach instead of following the brief), do not escalate. Re-brief the same tier with a Steps section only: numbered, literal, mechanical. Redesign is a brief-clarity failure, not a model-capability failure. Escalate only if typed steps also fail.
 - **Take over.** For a judgment problem the brief could not have anticipated, Fable fixes it directly. Keep this rare and deliberate.
 
 ## 6. After the last item
