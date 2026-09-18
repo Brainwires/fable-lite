@@ -2,10 +2,13 @@
   "external": {
     "baseUrl": "http://localhost:11434",
     "authToken": "ollama",
+    "strict": false,
     "routes": {
       "sonnet": "glm-5.3-flash:cloud",
-      "opus": "kimi-k2.7-code:cloud"
+      "opus": "kimi-k2.7-code:cloud",
+      "scout": "glm-5.3-flash:cloud",
+      "verifier": "glm-5.3-flash:cloud"
     },
-    "allowedTools": "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(npm *),Bash(npx *),Bash(pnpm *),Bash(cargo *),Bash(go *),Bash(python3 *),Bash(pytest *),Bash(make *),Bash(git diff *),Bash(git status *),Bash(ls *),Bash(cat *)"
+    "allowedTools": "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(npm *),Bash(npx *),Bash(pnpm *),Bash(yarn *),Bash(bun *),Bash(cargo *),Bash(go *),Bash(python3 *),Bash(pytest *),Bash(uv *),Bash(make *),Bash(bash *),Bash(git diff *),Bash(git status *),Bash(git log *),Bash(ls *),Bash(cat *),Bash(grep *)"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "description": "fable-lite: reminds the session of the routing rule at start. Set FABLE_LITE_QUIET=1 to disable.",
+  "description": "fable-lite: routing reminder and active external routes at session start; PreToolUse guard that redirects Agent calls for externally routed tiers (or all Agent calls in strict mode) to fable-lite-run. Set FABLE_LITE_QUIET=1 to silence the reminder.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,18 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-guard.sh\"",
             "timeout": 5
           }
         ]

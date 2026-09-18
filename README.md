@@ -144,7 +144,25 @@ fable-lite can run the Sonnet or Opus tier on a model that is not from Anthropic
 }
 ```
 
-With routes set, `/fable-lite:build` and `/fable-lite:delegate` send those tiers to the named models automatically. Without routes, nothing changes. Pin one plan item to a model with the tag `[EXT:<model>]`, or run a one-off with:
+Routes exist for all four roles: `sonnet`, `opus`, `scout`, and `verifier`. With routes set, `/fable-lite:build`, `/fable-lite:delegate`, and the auto-loaded skill send those roles to the named models, and a PreToolUse hook denies any Agent-tool call for a routed role with a message pointing at `fable-lite-run`. Without routes, nothing changes.
+
+**Strict mode.** Set `"strict": true` under `external` to block the Agent tool entirely. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
+
+```json
+{
+  "external": {
+    "strict": true,
+    "routes": {
+      "sonnet": "glm-5.3-flash:cloud",
+      "opus": "kimi-k2.7-code:cloud",
+      "scout": "glm-5.3-flash:cloud",
+      "verifier": "glm-5.3-flash:cloud"
+    }
+  }
+}
+```
+
+What still reaches Anthropic in strict mode: the orchestrator's own turns, and the small internal helper calls Claude Code makes on its own (for example skill relevance checks). Everything else runs on your endpoint. Pin one plan item to a model with the tag `[EXT:<model>]`, or run a one-off with:
 
 ```
 /fable-lite:external glm-5.3-flash:cloud add a --json flag to the list command
@@ -249,8 +267,9 @@ fable-lite/
 ├── examples/
 │   └── fable-lite.config.json
 ├── hooks/
-│   ├── hooks.json            # SessionStart reminder
-│   └── session-start.sh
+│   ├── hooks.json            # SessionStart reminder + PreToolUse Agent guard
+│   ├── session-start.sh
+│   └── agent-guard.sh        # denies Agent calls for routed roles / strict mode
 ├── README.md
 └── LICENSE
 ```

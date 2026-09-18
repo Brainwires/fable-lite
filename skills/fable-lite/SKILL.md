@@ -73,7 +73,11 @@ Subagents start with an empty context. They do not know what the user said, what
 
 ## External models (Ollama and friends)
 
-If `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) has `external.routes`, a tier listed there runs on the named external model instead of the Anthropic subagent: `routes.sonnet` replaces `sonnet-implementer`, `routes.opus` replaces `opus-implementer`. Check for routes once, at the start of the task:
+If `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) has `external.routes`, a role listed there runs on the named external model instead of the Anthropic subagent: `routes.sonnet` replaces `sonnet-implementer`, `routes.opus` replaces `opus-implementer`, `routes.scout` replaces `scout` (use `--role scout`), `routes.verifier` replaces `verifier` (use `--role verifier`). A PreToolUse hook denies Agent calls for routed roles, so this is enforced, not advisory.
+
+**Strict mode** (`external.strict: true`): the Agent tool is blocked entirely. The session does orchestration and auditing only; every delegated task, including read-only scouting and test runs, goes through `fable-lite-run`. Escalation after two failed audits means taking the item over in this session, since there is no Anthropic tier to escalate to. The session-start context says when strict mode is on.
+
+Check for routes once, at the start of the task:
 
 ```
 cat .fable-lite/config.json 2>/dev/null

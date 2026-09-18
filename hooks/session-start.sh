@@ -17,13 +17,22 @@ import json,sys
 d=json.load(open(sys.argv[1])).get("external",{})
 r=d.get("routes") or {}
 if r:
-    print("; ".join(f"{tier} tier -> {model}" for tier,model in r.items()))
+    print(("STRICT " if d.get("strict") else "") + "; ".join(f"{tier} -> {model}" for tier,model in r.items()))
 PY
 )
   if [ -n "$routes" ]; then
-    cat <<MSG
-[fable-lite] EXTERNAL ROUTES ACTIVE (from $cfg): $routes. For a routed tier, do NOT call the Agent tool; instead write the brief to .fable-lite/briefs/<slug>.md (typed numbered Steps required) and run with the Bash tool: fable-lite-run --model <model> --brief .fable-lite/briefs/<slug>.md  (run_in_background for parallel items). Its stdout is the agent report; audit it like an Agent result. Escalation from an external model goes to the Anthropic tier above, never to another external model. Unrouted tiers still use the Agent tool.
+    case "$routes" in
+      STRICT*)
+        cat <<MSG
+[fable-lite] STRICT EXTERNAL MODE (from $cfg): ${routes#STRICT }. The Agent tool is blocked by a hook; every delegated task runs on an external model. This session does only orchestration and auditing: understand, decide, write briefs, read diffs, report. For each task: write the brief to .fable-lite/briefs/<slug>.md (typed numbered Steps required) and run with the Bash tool: fable-lite-run --model <model> --brief <file> [--role scout|verifier]. Use --role scout for read-only questions (where is X, list callers, find an exemplar) and --role verifier for test/lint/build runs; run_in_background for parallel items. Stdout is the agent report; audit it like an Agent result. Escalation after two failed audits: take the item over here.
 MSG
+        ;;
+      *)
+        cat <<MSG
+[fable-lite] EXTERNAL ROUTES ACTIVE (from $cfg): $routes. For a routed tier, do NOT call the Agent tool (a hook will deny it); instead write the brief to .fable-lite/briefs/<slug>.md (typed numbered Steps required) and run with the Bash tool: fable-lite-run --model <model> --brief <file> [--role scout|verifier]  (run_in_background for parallel items). Its stdout is the agent report; audit it like an Agent result. Escalation from an external model goes to the Anthropic tier above, never to another external model. Unrouted tiers still use the Agent tool.
+MSG
+        ;;
+    esac
   fi
   break
 done
