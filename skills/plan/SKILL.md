@@ -20,11 +20,15 @@ This is Fable-tier work. Do it well, and do it once. Read `${CLAUDE_PLUGIN_ROOT}
 
 3. **Decompose, then merge.** Break the task into work items. Each item is something a single agent can finish from one brief in one sitting. Then merge: items that share a tier and touch the same area become one item with numbered steps. Target two to five items. Split only when a brief would exceed a page or when a design decision sits between two halves. Every agent spawn pays full orientation overhead, so fewer, fuller briefs win.
 
-4. **Score and tag.** Score each item with the rubric. Tag it `[SONNET]`, `[OPUS]`, or `[FABLE]`. Items tagged `[FABLE]` should be rare: usually they are a design decision Fable makes now, which then unlocks Opus or Sonnet items. Make those decisions in this step and write them down.
+4. **Score and tag.** Score each item with the rubric. Tag it `[SONNET]`, `[OPUS]`, or `[FABLE]`. Tags name the tier, not the engine: if `.fable-lite/config.json` routes a tier to an external model, build will run it there. To pin one item to a specific external model, tag it `[EXT:<model>]`, for example `[EXT:kimi-k2.7-code:cloud]`; such items need a fully typed Steps section in their brief. Items tagged `[FABLE]` should be rare: usually they are a design decision Fable makes now, which then unlocks Opus or Sonnet items. Make those decisions in this step and write them down.
 
 5. **Sequence.** Mark dependencies. Group independent items into waves that can run in parallel. Note items that touch overlapping files so build runs them sequentially or in worktrees.
 
 6. **Write the plan** to `.fable-lite/plan.md` in the project root using the format below. Create the directory if needed. Then show the plan to the user in the conversation and stop. Do not start building. The user runs `/fable-lite:build` when ready.
+
+## External routes (if configured)
+
+!`cat .fable-lite/config.json 2>/dev/null || echo "(no external routes; all tiers run on Anthropic subagents)"`
 
 ## Plan format
 

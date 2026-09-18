@@ -17,6 +17,7 @@ Print the following to the user, adapted lightly to the current context if a pla
 - `/fable-lite:build [items]` — dispatches the plan wave by wave, audits every result, updates status.
 - `/fable-lite:delegate <task> [--sonnet|--opus|--fable]` — one-off: score, brief, dispatch, audit, report.
 - `/fable-lite:audit [diff-target]` — Fable-tier review of the current changes with the verifier.
+- `/fable-lite:external <model> <task>` — run one item on a non-Anthropic model (Ollama local/cloud or any Anthropic-compatible endpoint). `/fable-lite:external list` shows models and routes.
 - `/fable-lite:help` — this.
 
 **Agents** (usable directly with the Agent tool as `fable-lite:<name>`)
@@ -24,6 +25,8 @@ Print the following to the user, adapted lightly to the current context if a pla
 - `sonnet-implementer` (Sonnet) — single-file, mechanical, pattern-copy edits
 - `opus-implementer` (Opus) — multi-file features, refactors, known-cause fixes, tests
 - `verifier` (Sonnet, read-only) — run tests / typecheck / lint / build and report
+
+**External models:** put `external.routes` in `.fable-lite/config.json` (see `${CLAUDE_PLUGIN_ROOT}/examples/fable-lite.config.json`) to run the Sonnet or Opus tier on, for example, `glm-5.3-flash:cloud` or `kimi-k2.7-code:cloud` through your Ollama sign-in.
 
 **Without commands:** the `fable-lite` skill loads automatically when implementation work is requested, and applies the same routing rule inside a normal conversation.
 

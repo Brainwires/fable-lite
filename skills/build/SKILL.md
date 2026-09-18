@@ -10,6 +10,10 @@ allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Edit, Wri
 
 Selected items: $ARGUMENTS (empty means every item whose status is `todo`)
 
+## External routes (if configured)
+
+!`cat .fable-lite/config.json 2>/dev/null || echo "(none)"`
+
 ## Current plan
 
 !`cat .fable-lite/plan.md 2>/dev/null || echo "NO PLAN FOUND. Run /fable-lite:plan <task> first."`
@@ -25,14 +29,17 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
 2. **Brief every item in the wave.** Expand each item's short brief into the full template. Include the plan's Decisions and Context sections verbatim where relevant. The agent has no other context. Set status to `in-progress` in the plan file.
 
 3. **Dispatch the wave in one message.** One Agent call per item:
-   - `[SONNET]` → `subagent_type: "fable-lite:sonnet-implementer"`
-   - `[OPUS]` → `subagent_type: "fable-lite:opus-implementer"`
+   - `[SONNET]` → `subagent_type: "fable-lite:sonnet-implementer"`, unless `external.routes.sonnet` is set, then the external runner with that model
+   - `[OPUS]` → `subagent_type: "fable-lite:opus-implementer"`, unless `external.routes.opus` is set, then the external runner with that model
+   - `[EXT:<model>]` → the external runner with that model
    - `[FABLE]` → do it here, in this session, now
+   External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief <file>` (in the background when more than one). External briefs always carry a typed Steps section. Its stdout is the agent report; audit it exactly like an Agent result.
    If two items in the same wave list overlapping files, run the second after the first, or give both `isolation: "worktree"` and merge afterward.
 
 4. **Audit each result as it arrives.** Follow the audit checklist. Read the diff, not the transcript. Then:
    - Accept → set status `done`
    - Send back → write a fix brief quoting the exact miss, re-dispatch to the same agent. Second miss on the same item escalates one tier (Sonnet → Opus → Fable).
+   - External model fails audit twice → escalate to the Anthropic tier above (`opus-implementer`, or Fable), not to another external model.
    - Redesigned instead of followed the brief → do not escalate. Re-dispatch to the same tier with a typed, numbered Steps section only. Escalate only if that also fails.
    - Take over → fix it here, set status `done`, note "completed on Fable" in the item
    - Agent reports BLOCKED with a real conflict → set status `blocked`, record the conflict, and decide: adjust the plan, or ask the user if the decision is theirs

@@ -19,6 +19,8 @@ Fable is the most capable model available and the most expensive. Most of the to
 | `opus-implementer` | subagent | Opus | multi-file or judgment-bearing implementation from a clear spec |
 | `verifier` | subagent | Sonnet | run tests, typecheck, lint, build; report faithfully |
 
+| external | nested `claude -p` | any Anthropic-API-compatible endpoint (Ollama local or cloud by default) | runs a Sonnet-tier or Opus-tier item on a non-Anthropic model when a route is configured |
+
 Agents are invoked with the Agent tool using `subagent_type` set to the plugin-namespaced name, for example `fable-lite:sonnet-implementer`. If the namespaced name is not accepted, use the bare name.
 
 ## The routing rule
@@ -65,6 +67,15 @@ When unsure between Sonnet and Opus, score the item with `references/routing-rub
 ## Briefs are the whole game
 
 Subagents start with an empty context. They do not know what the user said, what Fable read, or what was decided. A brief that assumes shared context produces a wrong result and a retry, which costs more than writing the brief properly. Every brief carries: goal, exact files, an exemplar when one exists, typed numbered steps for Sonnet-tier work, explicit scope boundaries, the definition of done, and the required report format. The cheap model is asked to type, not to design; if the steps cannot be written without making a decision, make the decision first. The template in `references/brief-template.md` is the minimum.
+
+## External models (Ollama and friends)
+
+If `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) has `external.routes`, a tier listed there runs on the named external model instead of the Anthropic subagent: `routes.sonnet` replaces `sonnet-implementer`, `routes.opus` replaces `opus-implementer`. Dispatch with `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief <file>` instead of the Agent tool; everything else (brief, audit, escalation) is unchanged. Two adjustments:
+
+- External models always get the Sonnet-tier brief discipline: typed numbered Steps, exemplar named, no open decisions, even when routed for Opus-tier work.
+- Escalation from an external model goes to the Anthropic tier above it (or Fable), never to a different external model.
+
+`/fable-lite:external <model> <task>` runs one item on a specific model without touching routes. `/fable-lite:external list` shows what is available.
 
 ## Agent budget: batch, don't sprawl
 

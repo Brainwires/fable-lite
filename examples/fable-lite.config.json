@@ -1,0 +1,11 @@
+{
+  "external": {
+    "baseUrl": "http://localhost:11434",
+    "authToken": "ollama",
+    "routes": {
+      "sonnet": "glm-5.3-flash:cloud",
+      "opus": "kimi-k2.7-code:cloud"
+    },
+    "allowedTools": "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(npm *),Bash(npx *),Bash(pnpm *),Bash(cargo *),Bash(go *),Bash(python3 *),Bash(pytest *),Bash(make *),Bash(git diff *),Bash(git status *),Bash(ls *),Bash(cat *)"
+  }
+}

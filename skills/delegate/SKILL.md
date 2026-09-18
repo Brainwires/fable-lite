@@ -1,7 +1,7 @@
 ---
 name: delegate
 description: Route a single task to the right fable-lite agent without writing a full plan. Fable scores the task, writes a brief, dispatches it to Sonnet or Opus (or keeps it if it is Fable-tier), audits the result, and reports.
-argument-hint: <task description> [--sonnet | --opus | --fable to force a tier]
+argument-hint: <task description> [--sonnet | --opus | --fable | --model <external-model>]
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Edit, Write, Agent
 ---
@@ -14,7 +14,7 @@ Use this for one-off work that does not need a plan file: a fix, a small feature
 
 ## Procedure
 
-1. **Parse a forced tier** if the task ends with `--sonnet`, `--opus`, or `--fable`. Strip the flag from the task text.
+1. **Parse a forced tier** if the task ends with `--sonnet`, `--opus`, `--fable`, or `--model <name>`. Strip the flag from the task text. `--model` sends the item to that external model via `/fable-lite:external` rules; otherwise, if `.fable-lite/config.json` routes the chosen tier externally, use the external runner for that tier.
 
 2. **Score the task** with `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/routing-rubric.md` unless a tier was forced. If the score says the task is too big or too ambiguous to delegate as one item, say so and suggest `/fable-lite:plan` instead. If it is ambiguous in a way only the user can resolve, ask.
 
@@ -26,6 +26,7 @@ Use this for one-off work that does not need a plan file: a fix, a small feature
    - Sonnet → `subagent_type: "fable-lite:sonnet-implementer"`
    - Opus → `subagent_type: "fable-lite:opus-implementer"`
    - Fable → do it here
+   - External (explicit `--model`, or a routed tier) → write the brief to `.fable-lite/briefs/<slug>.md` and run `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief <file>`. Typed Steps required.
 
 6. **Audit** with `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/audit-checklist.md`. Send back once with a precise fix brief if needed; escalate one tier on a second miss.
 

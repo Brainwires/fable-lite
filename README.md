@@ -65,6 +65,7 @@ Restart Claude Code (or start a new session) after installing. You should see a 
 | `/fable-lite:build [items]` | Executes the plan wave by wave. Briefs and dispatches each item to its tier, audits every result on Fable, updates status in the plan file, runs the verifier at the end. |
 | `/fable-lite:delegate <task> [--sonnet\|--opus\|--fable]` | One-off. Scores the task, briefs it, dispatches, audits, reports. Force a tier with a flag. |
 | `/fable-lite:audit [diff-target]` | Fable-tier review of the working tree (or a git diff target) against the audit checklist, with the verifier. Reports only; changes nothing. |
+| `/fable-lite:external <model> <task>` | Runs one item on a non-Anthropic model through a nested harness pointed at Ollama (or any Anthropic-compatible endpoint). `list` shows models and routes. |
 | `/fable-lite:help` | Prints the routing rule, commands, and agents. |
 
 ### Typical session
@@ -123,6 +124,41 @@ Hard overrides: blast radius 2 means Fable designs the change and audits line by
 
 The full rubric with worked examples is in `skills/fable-lite/references/routing-rubric.md`.
 
+## External models: Ollama and other Anthropic-compatible endpoints
+
+fable-lite can run the Sonnet or Opus tier on a model that is not from Anthropic. Claude Code has no per-agent provider switch: the Agent tool always talks to the session's own endpoint, so a subagent cannot be pointed at Ollama while the orchestrator stays on Claude. fable-lite gets around that by spawning a **nested Claude Code harness** for the item, with its endpoint set to Ollama for that process only. The nested run gets the same brief, the same implementer rules appended to its system prompt, the same tools, and reports in the same format, so Fable audits it exactly like any other result. No MCP server, no proxy, and the orchestrator's own Claude session and cache are untouched.
+
+**Auth.** The default endpoint is the local Ollama daemon (`http://localhost:11434`), which handles cloud models through your `ollama signin` account. No API key is needed, and cloud models take the `:cloud` suffix (`glm-5.3-flash:cloud`). To hit `https://ollama.com` directly instead, set `external.baseUrl` to it and export `OLLAMA_API_KEY`. Any other endpoint that speaks the Anthropic Messages API works the same way with `external.baseUrl` and `external.authToken`.
+
+**Configure routes** in `.fable-lite/config.json` (project) or `~/.claude/fable-lite.json` (user). Copy `examples/fable-lite.config.json`:
+
+```json
+{
+  "external": {
+    "baseUrl": "http://localhost:11434",
+    "routes": {
+      "sonnet": "glm-5.3-flash:cloud",
+      "opus": "kimi-k2.7-code:cloud"
+    }
+  }
+}
+```
+
+With routes set, `/fable-lite:build` and `/fable-lite:delegate` send those tiers to the named models automatically. Without routes, nothing changes. Pin one plan item to a model with the tag `[EXT:<model>]`, or run a one-off with:
+
+```
+/fable-lite:external glm-5.3-flash:cloud add a --json flag to the list command
+/fable-lite:external list
+```
+
+**Rules that differ for external models**
+- They always get Sonnet-tier brief discipline: a typed, numbered Steps section, an exemplar, no open decisions, even when routed for Opus-tier work.
+- Escalation goes to the Anthropic tier above (Opus, then Fable), never to a different external model.
+- The nested harness only has the tools in `external.allowedTools` (or the role default, which covers file edits and common test runners). Denied tool calls are listed in the runner's summary so you can widen the list.
+- Full JSON for each run lands in `.fable-lite/runs/`. The cost field in it is a placeholder for non-Anthropic models.
+
+The runner is `scripts/external-run.sh`; run it with `--help` for flags. It also supports `--role scout` and `--role verifier` for read-only external runs.
+
 ## The handoff rule: typed steps, not goals
 
 The cheap model is asked to type, not to design. A Sonnet-tier brief carries a numbered Steps section that reads like a diff described in prose. If a step cannot be written without making a decision, the design is not finished and the item is not ready to delegate. When an implementer comes back having redesigned something, the plugin does not escalate to a smarter model; it re-sends the same item to the same tier as literal typed steps. Redesign is a brief-clarity failure, not a capability failure. Escalation happens only when typed steps also fail.
@@ -154,7 +190,11 @@ The `fable-lite` skill also loads automatically when you ask for implementation 
 
 ## Files this plugin creates in your project
 
-- `.fable-lite/plan.md` — the current plan, written by `/fable-lite:plan`, updated by `/fable-lite:build`. Add `.fable-lite/` to your `.gitignore` if you do not want plans committed.
+- `.fable-lite/plan.md` — the current plan, written by `/fable-lite:plan`, updated by `/fable-lite:build`.
+- `.fable-lite/config.json` — optional external routes.
+- `.fable-lite/briefs/` and `.fable-lite/runs/` — briefs and full JSON results for external runs.
+
+Add `.fable-lite/` to your `.gitignore` if you do not want these committed (keep `config.json` if the team shares routes).
 
 ## Configuration
 
@@ -187,6 +227,12 @@ fable-lite/
 │   ├── delegate/SKILL.md     # /fable-lite:delegate
 │   ├── audit/SKILL.md        # /fable-lite:audit
 │   └── help/SKILL.md         # /fable-lite:help
+│   └── external/SKILL.md     # /fable-lite:external
+├── scripts/
+│   ├── external-run.sh       # nested harness runner for non-Anthropic models
+│   └── external-models.sh    # lists Ollama local/cloud models and routes
+├── examples/
+│   └── fable-lite.config.json
 ├── hooks/
 │   ├── hooks.json            # SessionStart reminder
 │   └── session-start.sh
@@ -201,6 +247,7 @@ Because the expensive parts of a task are exactly the parts where model quality 
 ## Requirements
 
 - Claude Code 2.1 or later (plugin skills, namespaced agents, `${CLAUDE_PLUGIN_ROOT}`)
+- For external models: Ollama 0.13 or later (Anthropic-compatible API) with `ollama signin` for cloud models, `python3` on PATH for the runner's JSON handling
 - A session model worth protecting. The plugin works on any session model, but the savings come from running the orchestrator on Fable.
 
 ## Contributing
