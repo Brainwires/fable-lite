@@ -20,6 +20,7 @@
 #   --base-url <url>      Endpoint (default: $FABLE_LITE_EXTERNAL_BASE_URL, config, or http://localhost:11434)
 #   --token <token>       Bearer token (default: $FABLE_LITE_EXTERNAL_TOKEN, config, or "ollama")
 #   --json                Print the full JSON envelope instead of just the report text
+#   --version             Print the plugin version and exit
 #
 # Config file (optional): .fable-lite/config.json in the project, then ~/.claude/fable-lite.json
 #   { "external": { "baseUrl": "...", "authToken": "...", "allowedTools": "...",
@@ -44,6 +45,7 @@ while [ $# -gt 0 ]; do
     --base-url) BASE_URL="$2"; shift 2;;
     --token) TOKEN="$2"; shift 2;;
     --json) WANT_JSON=1; shift;;
+    --version) v=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null || echo unknown); echo "fable-lite external-run $v"; exit 0;;
     -h|--help) sed -n '2,30p' "$0"; exit 0;;
     *) echo "external-run: unknown option $1" >&2; exit 3;;
   esac

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Stable entry point for the fable-lite external runner. Plugin bin/ dirs are on PATH inside Claude Code sessions.
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/external-run.sh" "$@"

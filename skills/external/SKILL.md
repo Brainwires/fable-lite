@@ -3,18 +3,18 @@ name: external
 description: Delegate a task to a non-Anthropic model (Ollama local or cloud, or any Anthropic-API-compatible endpoint) through a nested Claude Code harness, then audit the result on Fable. Also lists available external models and current tier routes when called with no task.
 argument-hint: <model> <task>   |   list   |   --role scout|verifier <model> <task>
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Write, Agent
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(fable-lite-run *), Bash(fable-lite-models *), Write, Agent
 ---
 
 # /fable-lite:external
 
 Arguments: $ARGUMENTS
 
-Runs work on a model that is not an Anthropic model, using the same brief, the same implementer rules, and the same audit as any other fable-lite delegation. The runner is `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh`; it spawns a nested `claude -p` pointed at the configured endpoint (Ollama's local daemon by default, which uses the user's Ollama sign-in, so no API key is needed).
+Runs work on a model that is not an Anthropic model, using the same brief, the same implementer rules, and the same audit as any other fable-lite delegation. The runner is `fable-lite-run` (on PATH via the plugin's `bin/`, wrapping `scripts/external-run.sh`); it spawns a nested `claude -p` pointed at the configured endpoint (Ollama's local daemon by default, which uses the user's Ollama sign-in, so no API key is needed).
 
 ## If the argument is `list` or empty
 
-Run `${CLAUDE_PLUGIN_ROOT}/scripts/external-models.sh` and show the output. Stop.
+Run `fable-lite-models` and show the output. Stop.
 
 ## Otherwise
 
@@ -26,7 +26,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/external-models.sh` and show the output. Stop
 
 4. **Dispatch:**
    ```
-   ${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief .fable-lite/briefs/<slug>.md [--role scout|verifier]
+   fable-lite-run --model <model> --brief .fable-lite/briefs/<slug>.md [--role scout|verifier]
    ```
    Run it in the background when dispatching more than one, so they proceed in parallel. Each run writes its full JSON to `.fable-lite/runs/`.
 

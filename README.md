@@ -157,7 +157,19 @@ With routes set, `/fable-lite:build` and `/fable-lite:delegate` send those tiers
 - The nested harness only has the tools in `external.allowedTools` (or the role default, which covers file edits and common test runners). Denied tool calls are listed in the runner's summary so you can widen the list.
 - Full JSON for each run lands in `.fable-lite/runs/`. The cost field in it is a placeholder for non-Anthropic models.
 
-The runner is `scripts/external-run.sh`; run it with `--help` for flags. It also supports `--role scout` and `--role verifier` for read-only external runs.
+**From a normal conversation.** The orchestrator does not need a slash command. The plugin puts `fable-lite-run` and `fable-lite-models` on the session PATH, and the auto-loaded skill teaches the routing: when a tier is routed externally, the orchestrator writes the brief to `.fable-lite/briefs/<slug>.md` and runs
+
+```
+fable-lite-run --model glm-5.3-flash:cloud --brief .fable-lite/briefs/<slug>.md
+```
+
+with the Bash tool, in the background when there is more than one item, then audits the report on stdout exactly like an Agent result. The skill pre-approves `fable-lite-run` and `fable-lite-models` for the turns it is active in. To avoid any permission prompt in every session, add the same two rules to your settings:
+
+```json
+{ "permissions": { "allow": ["Bash(fable-lite-run *)", "Bash(fable-lite-models *)"] } }
+```
+
+`fable-lite-run --help` lists the flags. `--role scout` and `--role verifier` give read-only external runs; `--cwd` targets a worktree.
 
 ## The handoff rule: typed steps, not goals
 
@@ -228,6 +240,9 @@ fable-lite/
 │   ├── audit/SKILL.md        # /fable-lite:audit
 │   └── help/SKILL.md         # /fable-lite:help
 │   └── external/SKILL.md     # /fable-lite:external
+├── bin/
+│   ├── fable-lite-run        # on PATH in sessions; wraps scripts/external-run.sh
+│   └── fable-lite-models     # wraps scripts/external-models.sh
 ├── scripts/
 │   ├── external-run.sh       # nested harness runner for non-Anthropic models
 │   └── external-models.sh    # lists Ollama local/cloud models and routes

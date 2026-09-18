@@ -3,7 +3,7 @@ name: build
 description: Execute the current fable-lite plan. Dispatches each work item to the model tier the plan assigned, in dependency order and in parallel where possible, audits every result on Fable, and updates item status in .fable-lite/plan.md.
 argument-hint: [item numbers to run, e.g. "1 2" — default all pending]
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Edit, Write, Agent
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(fable-lite-run *), Bash(fable-lite-models *), Edit, Write, Agent
 ---
 
 # /fable-lite:build
@@ -33,7 +33,7 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
    - `[OPUS]` → `subagent_type: "fable-lite:opus-implementer"`, unless `external.routes.opus` is set, then the external runner with that model
    - `[EXT:<model>]` → the external runner with that model
    - `[FABLE]` → do it here, in this session, now
-   External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief <file>` (in the background when more than one). External briefs always carry a typed Steps section. Its stdout is the agent report; audit it exactly like an Agent result.
+   External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `fable-lite-run --model <model> --brief <file>` (in the background when more than one). External briefs always carry a typed Steps section. Its stdout is the agent report; audit it exactly like an Agent result.
    If two items in the same wave list overlapping files, run the second after the first, or give both `isolation: "worktree"` and merge afterward.
 
 4. **Audit each result as it arrives.** Follow the audit checklist. Read the diff, not the transcript. Then:

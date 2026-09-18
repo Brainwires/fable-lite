@@ -1,6 +1,7 @@
 ---
 name: fable-lite
-description: This skill should be used whenever the session is running on Fable (or another premium model) and the user asks for implementation work, a feature, a fix, a refactor, or a multi-step change. It routes work by value: the Fable session keeps planning, judgment, and auditing, and delegates well-specified implementation to Opus or Sonnet subagents. Also triggers on "fable-lite", "delegate this", "don't burn Fable on this", "route to sonnet/opus", or "use the cheap model for the grunt work".
+description: This skill should be used whenever the session is running on Fable (or another premium model) and the user asks for implementation work, a feature, a fix, a refactor, or a multi-step change. It routes work by value: the Fable session keeps planning, judgment, and auditing, and delegates well-specified implementation to Opus or Sonnet subagents, or to Ollama/external models when routes are configured. Also triggers on "fable-lite", "delegate this", "don't burn Fable on this", "route to sonnet/opus", or "use the cheap model for the grunt work".
+allowed-tools: Bash(fable-lite-run *), Bash(fable-lite-models *), Bash(cat .fable-lite/*), Bash(mkdir -p .fable-lite/*)
 ---
 
 # fable-lite: spend Fable where it matters
@@ -26,6 +27,8 @@ Agents are invoked with the Agent tool using `subagent_type` set to the plugin-n
 ## The routing rule
 
 Before doing any piece of work yourself, ask: **does this step need Fable?**
+
+**Engine resolution comes first.** A tier names a level of work, not a process. Before every implementer dispatch, resolve the engine: if the session-start context or `.fable-lite/config.json` lists an external route for that tier, the engine is `fable-lite-run` with that model, and calling `fable-lite:sonnet-implementer` or `fable-lite:opus-implementer` for it is a routing error. Only unrouted tiers use the Agent tool.
 
 **Keep on Fable:**
 - Understanding the request and resolving ambiguity with the user
@@ -70,7 +73,23 @@ Subagents start with an empty context. They do not know what the user said, what
 
 ## External models (Ollama and friends)
 
-If `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) has `external.routes`, a tier listed there runs on the named external model instead of the Anthropic subagent: `routes.sonnet` replaces `sonnet-implementer`, `routes.opus` replaces `opus-implementer`. Dispatch with `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief <file>` instead of the Agent tool; everything else (brief, audit, escalation) is unchanged. Two adjustments:
+If `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) has `external.routes`, a tier listed there runs on the named external model instead of the Anthropic subagent: `routes.sonnet` replaces `sonnet-implementer`, `routes.opus` replaces `opus-implementer`. Check for routes once, at the start of the task:
+
+```
+cat .fable-lite/config.json 2>/dev/null
+```
+
+**Dispatching from a normal conversation** (no slash command needed). `fable-lite-run` is on PATH whenever the plugin is installed; it is the external equivalent of an Agent call:
+
+1. Write the brief to `.fable-lite/briefs/<slug>.md` (create the directory). Typed numbered Steps are required.
+2. Run it with the Bash tool:
+   ```
+   fable-lite-run --model <model> --brief .fable-lite/briefs/<slug>.md [--role scout|verifier] [--cwd <worktree>]
+   ```
+   Use `run_in_background: true` when dispatching more than one, or when the item will take more than a minute; the completion notification carries the report. Stdout is the agent's report in the standard format, so audit it exactly like an Agent result.
+3. `fable-lite-models` lists the models the endpoint offers and the current routes.
+
+Everything else (brief discipline, audit, escalation) is unchanged from Anthropic subagents. Two adjustments:
 
 - External models always get the Sonnet-tier brief discipline: typed numbered Steps, exemplar named, no open decisions, even when routed for Opus-tier work.
 - Escalation from an external model goes to the Anthropic tier above it (or Fable), never to a different external model.

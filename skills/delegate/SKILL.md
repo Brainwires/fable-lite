@@ -3,7 +3,7 @@ name: delegate
 description: Route a single task to the right fable-lite agent without writing a full plan. Fable scores the task, writes a brief, dispatches it to Sonnet or Opus (or keeps it if it is Fable-tier), audits the result, and reports.
 argument-hint: <task description> [--sonnet | --opus | --fable | --model <external-model>]
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Edit, Write, Agent
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(fable-lite-run *), Bash(fable-lite-models *), Edit, Write, Agent
 ---
 
 # /fable-lite:delegate
@@ -26,7 +26,7 @@ Use this for one-off work that does not need a plan file: a fix, a small feature
    - Sonnet → `subagent_type: "fable-lite:sonnet-implementer"`
    - Opus → `subagent_type: "fable-lite:opus-implementer"`
    - Fable → do it here
-   - External (explicit `--model`, or a routed tier) → write the brief to `.fable-lite/briefs/<slug>.md` and run `${CLAUDE_PLUGIN_ROOT}/scripts/external-run.sh --model <model> --brief <file>`. Typed Steps required.
+   - External (explicit `--model`, or a routed tier) → write the brief to `.fable-lite/briefs/<slug>.md` and run `fable-lite-run --model <model> --brief <file>`. Typed Steps required.
 
 6. **Audit** with `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/audit-checklist.md`. Send back once with a precise fix brief if needed; escalate one tier on a second miss.
 
