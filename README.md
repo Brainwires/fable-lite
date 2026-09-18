@@ -146,7 +146,7 @@ fable-lite can run the Sonnet or Opus tier on a model that is not from Anthropic
 
 Routes exist for all four roles: `sonnet`, `opus`, `scout`, and `verifier`. With routes set, `/fable-lite:build`, `/fable-lite:delegate`, and the auto-loaded skill send those roles to the named models, and a PreToolUse hook denies any Agent-tool call for a routed role with a message pointing at `fable-lite-run`. Without routes, nothing changes.
 
-**Strict mode.** Set `"strict": true` under `external` to block the Agent tool entirely. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
+**Strict mode.** Set `"strict": true` under `external` and three PreToolUse hooks enforce the split: the Agent tool is denied, Edit/Write are denied outside `.fable-lite/`, and test/build/lint/install commands are denied in Bash. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts the edit and Bash guards until it is removed, so a deliberate takeover after two failed audits is possible and visible. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
 
 ```json
 {
@@ -269,7 +269,10 @@ fable-lite/
 ├── hooks/
 │   ├── hooks.json            # SessionStart reminder + PreToolUse Agent guard
 │   ├── session-start.sh
-│   └── agent-guard.sh        # denies Agent calls for routed roles / strict mode
+│   ├── agent-guard.sh        # denies Agent calls for routed roles / strict mode
+│   ├── edit-guard.sh         # strict: denies Edit/Write outside .fable-lite/
+│   ├── bash-guard.sh         # strict: denies test/build/lint runs in-session
+│   └── strict-common.sh
 ├── README.md
 └── LICENSE
 ```

@@ -1,14 +1,10 @@
 {
-  "description": "fable-lite: routing reminder and active external routes at session start; PreToolUse guard that redirects Agent calls for externally routed tiers (or all Agent calls in strict mode) to fable-lite-run. Set FABLE_LITE_QUIET=1 to silence the reminder.",
+  "description": "fable-lite: routing reminder and active external routes at session start; PreToolUse guards that keep delegated work off this session when routes or strict mode are configured (Agent calls for routed roles; in strict mode also Edit/Write outside .fable-lite/ and test/build/lint commands). Set FABLE_LITE_QUIET=1 to silence the reminder.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
-            "timeout": 5
-          }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"", "timeout": 5 }
         ]
       }
     ],
@@ -16,11 +12,19 @@
       {
         "matcher": "Agent",
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-guard.sh\"",
-            "timeout": 5
-          }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-guard.sh\"", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/edit-guard.sh\"", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bash-guard.sh\"", "timeout": 5 }
         ]
       }
     ]
