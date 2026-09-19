@@ -17,6 +17,7 @@
 #   --cwd <dir>           Working directory for the run (default: current directory)
 #   --tools <list>        Comma-separated allowed tools (overrides role default and config)
 #   --max-turns <n>       Cap agent turns (default 60)
+#   --retries <n>         Retry this many times on transient endpoint errors (default 1)
 #   --base-url <url>      Endpoint (default: $FABLE_LITE_EXTERNAL_BASE_URL, config, or http://localhost:11434)
 #   --token <token>       Bearer token (default: $FABLE_LITE_EXTERNAL_TOKEN, config, or "ollama")
 #   --json                Print the full JSON envelope instead of just the report text
@@ -30,8 +31,17 @@
 # Exit code: 0 on a completed run, 2 on a harness failure, 3 on bad arguments.
 set -euo pipefail
 
+# Refuse to nest: an external run must not itself launch another external run.
+# The nested harness inherits the user's settings (enabled plugin, strict config),
+# so without this a confused inner model could recurse. FABLE_LITE_INNER is set on
+# the nested process below and also disables the guards/session-start for it.
+if [ -n "${FABLE_LITE_INNER:-}" ]; then
+  echo "external-run: refusing to nest — you are already inside a fable-lite external run; do the work directly." >&2
+  exit 3
+fi
+
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-MODEL="" BRIEF_FILE="" BRIEF_TEXT="" ROLE="implementer" RUN_CWD="$PWD" TOOLS="" MAX_TURNS=60 BASE_URL="" TOKEN="" WANT_JSON=0
+MODEL="" BRIEF_FILE="" BRIEF_TEXT="" ROLE="implementer" RUN_CWD="$PWD" TOOLS="" MAX_TURNS=60 BASE_URL="" TOKEN="" WANT_JSON=0 RETRIES=1
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -42,11 +52,12 @@ while [ $# -gt 0 ]; do
     --cwd) RUN_CWD="$2"; shift 2;;
     --tools) TOOLS="$2"; shift 2;;
     --max-turns) MAX_TURNS="$2"; shift 2;;
+    --retries) RETRIES="$2"; shift 2;;
     --base-url) BASE_URL="$2"; shift 2;;
     --token) TOKEN="$2"; shift 2;;
     --json) WANT_JSON=1; shift;;
     --version) v=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null || echo unknown); echo "fable-lite external-run $v"; exit 0;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0;;
+    -h|--help) sed -n '2,31p' "$0"; exit 0;;
     *) echo "external-run: unknown option $1" >&2; exit 3;;
   esac
 done
@@ -110,35 +121,56 @@ BRIEF="${BRIEF_TEXT:-$(cat "$BRIEF_FILE")}"
 STAMP=$(date +%Y%m%d-%H%M%S)
 SAFE_MODEL=$(printf '%s' "$MODEL" | tr -c 'A-Za-z0-9._-' '_')
 RUN_DIR="$RUN_CWD/.fable-lite/runs"; mkdir -p "$RUN_DIR"
-OUT_JSON="$RUN_DIR/$STAMP-$SAFE_MODEL.json"
+# Include the PID so parallel runs (e.g. from fable-lite-batch) in the same
+# second with the same model never collide on the output path.
+OUT_JSON="$RUN_DIR/$STAMP-$SAFE_MODEL-$$.json"
 
 # --- run. Unset every Anthropic credential so the nested process cannot fall back to the user's Claude account.
-set +e
-( cd "$RUN_CWD" && env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_MODEL -u CLAUDE_CODE_SUBAGENT_MODEL \
-    ANTHROPIC_BASE_URL="$BASE_URL" ANTHROPIC_AUTH_TOKEN="$TOKEN" \
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 FABLE_LITE_QUIET=1 \
-    claude -p "$BRIEF" --model "$MODEL" --output-format json \
-      --allowedTools "$TOOLS" --max-turns "$MAX_TURNS" \
-      --append-system-prompt "$SYSTEM_APPEND" < /dev/null ) > "$OUT_JSON.raw" 2> "$OUT_JSON.stderr"
-RC=$?
-set -e
+# Retry on transient endpoint errors (capacity/overload/timeout) up to $RETRIES times.
+case "$RETRIES" in ''|*[!0-9]*) RETRIES=1;; esac
+ATTEMPT=0
+while :; do
+  ATTEMPT=$((ATTEMPT + 1))
+  set +e
+  # Isolate the nested session: disable fable-lite and all hooks so the inner
+  # model cannot load the routing skill/guards and recurse into another external
+  # run. FABLE_LITE_INNER is a belt-and-suspenders backstop for the refuse-to-nest
+  # check where env happens to propagate.
+  ( cd "$RUN_CWD" && env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_MODEL -u CLAUDE_CODE_SUBAGENT_MODEL \
+      ANTHROPIC_BASE_URL="$BASE_URL" ANTHROPIC_AUTH_TOKEN="$TOKEN" \
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 FABLE_LITE_QUIET=1 FABLE_LITE_INNER=1 \
+      claude -p "$BRIEF" --model "$MODEL" --output-format json \
+        --allowedTools "$TOOLS" --max-turns "$MAX_TURNS" \
+        --settings '{"enabledPlugins":{"fable-lite@fable-lite":false},"disableAllHooks":true}' \
+        --append-system-prompt "$SYSTEM_APPEND" < /dev/null ) > "$OUT_JSON.raw" 2> "$OUT_JSON.stderr"
+  RC=$?
+  set -e
+  [ "$RC" -eq 0 ] && break
+  if [ "$ATTEMPT" -le "$RETRIES" ] && \
+     grep -qiE 'overloaded|capacity|rate.?limit|(^|[^0-9])(429|503)([^0-9]|$)|timed? ?out|connection (refused|reset|error)|temporarily unavailable|EOF occurred' "$OUT_JSON.raw" "$OUT_JSON.stderr" 2>/dev/null; then
+    sleep $((ATTEMPT * 2))
+    continue
+  fi
+  break
+done
 
 # The CLI may print warnings before the JSON; keep only the JSON object.
-python3 - "$OUT_JSON.raw" "$OUT_JSON" "$WANT_JSON" "$MODEL" "$BASE_URL" <<'PY'
-import sys,json,re
+FL_ATTEMPTS="$ATTEMPT" python3 - "$OUT_JSON.raw" "$OUT_JSON" "$WANT_JSON" "$MODEL" "$BASE_URL" <<'PY'
+import sys,json,re,os
 raw=open(sys.argv[1]).read()
+attempts=os.environ.get("FL_ATTEMPTS","1")
 m=re.search(r'\{.*\}\s*$', raw, re.S)
 if not m:
-    print(f"external-run: no JSON result from harness (model {sys.argv[4]} at {sys.argv[5]}). Raw output:\n{raw[-2000:]}", file=sys.stderr); sys.exit(2)
+    print(f"external-run: no JSON result from harness (model {sys.argv[4]} at {sys.argv[5]}, attempts={attempts}). Raw output:\n{raw[-2000:]}", file=sys.stderr); sys.exit(2)
 d=json.loads(m.group(0))
-d["_fable_lite"]={"model":sys.argv[4],"base_url":sys.argv[5]}
+d["_fable_lite"]={"model":sys.argv[4],"base_url":sys.argv[5],"attempts":int(attempts)}
 json.dump(d, open(sys.argv[2],'w'), indent=2)
 if sys.argv[3]=="1":
     print(json.dumps(d, indent=2))
 else:
     print(d.get("result") or "(empty result)")
     u=d.get("usage",{})
-    print(f"\n---\nexternal-run: model={sys.argv[4]} turns={d.get('num_turns')} in={u.get('input_tokens')} out={u.get('output_tokens')} denials={len(d.get('permission_denials',[]))} json={sys.argv[2]}")
+    print(f"\n---\nexternal-run: model={sys.argv[4]} turns={d.get('num_turns')} in={u.get('input_tokens')} out={u.get('output_tokens')} denials={len(d.get('permission_denials',[]))} attempts={attempts} json={sys.argv[2]}")
     if d.get("permission_denials"):
         print("external-run: some tool calls were denied. Widen --tools or external.allowedTools if they were legitimate:", file=sys.stderr)
         for p in d["permission_denials"][:10]:

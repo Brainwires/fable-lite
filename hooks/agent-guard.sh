@@ -10,6 +10,7 @@
 #     is set), and lets everything else through.
 # Exits 0 with no output when there is nothing to enforce.
 set -uo pipefail
+[ -n "${FABLE_LITE_INNER:-}" ] && exit 0   # never guard a nested external run
 
 input=$(cat)
 cfg=""

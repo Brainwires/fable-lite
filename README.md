@@ -146,7 +146,7 @@ fable-lite can run the Sonnet or Opus tier on a model that is not from Anthropic
 
 Routes exist for all four roles: `sonnet`, `opus`, `scout`, and `verifier`. With routes set, `/fable-lite:build`, `/fable-lite:delegate`, and the auto-loaded skill send those roles to the named models, and a PreToolUse hook denies any Agent-tool call for a routed role with a message pointing at `fable-lite-run`. Without routes, nothing changes.
 
-**Strict mode.** Set `"strict": true` under `external` and three PreToolUse hooks enforce the split: the Agent tool is denied, Edit/Write are denied outside `.fable-lite/`, and test/build/lint/install commands are denied in Bash. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts the edit and Bash guards until it is removed, so a deliberate takeover after two failed audits is possible and visible. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
+**Strict mode.** Set `"strict": true` under `external` and three PreToolUse hooks enforce the split: the Agent tool is denied, Edit/Write to **project code** are denied, and test/build/lint/install runs plus code-writing Bash (heredocs, `sed -i`, `tee`, `cp`, `mv`, `patch`, `git apply`) are denied. "Project code" means files inside the project tree except under `.fable-lite/`; writes outside the project tree (the plans dir, the scratchpad, `~/.claude`, `/tmp`) are orchestration and stay allowed, so plan mode and note-taking still work. The Bash write-guard is fail-closed: a write-shaped command whose target can't be resolved is denied. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts the edit and Bash guards until it is removed, so a deliberate takeover after two failed audits is possible and visible. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
 
 ```json
 {
@@ -181,13 +181,35 @@ What still reaches Anthropic in strict mode: the orchestrator's own turns, and t
 fable-lite-run --model glm-5.3-flash:cloud --brief .fable-lite/briefs/<slug>.md
 ```
 
-with the Bash tool, in the background when there is more than one item, then audits the report on stdout exactly like an Agent result. The skill pre-approves `fable-lite-run` and `fable-lite-models` for the turns it is active in. To avoid any permission prompt in every session, add the same two rules to your settings:
+with the Bash tool, then audits the report on stdout exactly like an Agent result. To avoid any permission prompt, allow the four commands in your settings:
 
 ```json
-{ "permissions": { "allow": ["Bash(fable-lite-run *)", "Bash(fable-lite-models *)"] } }
+{ "permissions": { "allow": [
+  "Bash(fable-lite-run *)", "Bash(fable-lite-models *)",
+  "Bash(fable-lite-batch *)", "Bash(fable-lite-stats *)"
+] } }
 ```
 
-`fable-lite-run --help` lists the flags. `--role scout` and `--role verifier` give read-only external runs; `--cwd` targets a worktree.
+`fable-lite-run --help` lists the flags. `--role scout` and `--role verifier` give read-only external runs; `--cwd` targets a worktree; `--retries <n>` retries transient endpoint errors (capacity, overload, timeout) with backoff.
+
+**Dispatch a whole wave at once.** Instead of one run per turn, write every brief, then hand a manifest to `fable-lite-batch`:
+
+```json
+[
+  {"model": "glm-5.3-flash:cloud", "brief": ".fable-lite/briefs/1-parser.md"},
+  {"model": "kimi-k2.7-code:cloud", "brief": ".fable-lite/briefs/2-endpoint.md", "role": "implementer"}
+]
+```
+
+```
+fable-lite-batch wave.json
+```
+
+It runs the items in parallel (concurrency 4), prints one combined report with a header per item, and exits non-zero if any item failed. The orchestrator dispatches and audits the whole wave from a single tool result, which is the main lever on orchestrator turns. Each item's full JSON still lands in `.fable-lite/runs/`.
+
+**See the offload.** `fable-lite-stats` (or `/fable-lite:stats`) reads `.fable-lite/runs/` and prints runs, turns, and tokens per external model, so the split is measurable. `--since YYYY-MM-DD` limits the window.
+
+**Nested-session isolation.** Each external run launches a nested Claude Code harness with the fable-lite plugin and all hooks disabled (`--settings`), so the inner model never loads the routing skill or the strict guards and cannot recurse into another external run. Developing fable-lite itself is likewise not offloaded: a gitignored `.fable-lite/config.json` with `{"external":{"strict":false}}` in the plugin repo turns the guards off there.
 
 ## The handoff rule: typed steps, not goals
 
@@ -256,23 +278,28 @@ fable-lite/
 │   ├── build/SKILL.md        # /fable-lite:build
 │   ├── delegate/SKILL.md     # /fable-lite:delegate
 │   ├── audit/SKILL.md        # /fable-lite:audit
-│   └── help/SKILL.md         # /fable-lite:help
-│   └── external/SKILL.md     # /fable-lite:external
+│   ├── help/SKILL.md         # /fable-lite:help
+│   ├── external/SKILL.md     # /fable-lite:external
+│   └── stats/SKILL.md        # /fable-lite:stats
 ├── bin/
 │   ├── fable-lite-run        # on PATH in sessions; wraps scripts/external-run.sh
-│   └── fable-lite-models     # wraps scripts/external-models.sh
+│   ├── fable-lite-models     # wraps scripts/external-models.sh
+│   ├── fable-lite-batch      # wraps scripts/external-batch.sh
+│   └── fable-lite-stats      # wraps scripts/external-stats.sh
 ├── scripts/
 │   ├── external-run.sh       # nested harness runner for non-Anthropic models
-│   └── external-models.sh    # lists Ollama local/cloud models and routes
+│   ├── external-batch.sh     # runs a manifest of briefs in parallel, one report
+│   ├── external-models.sh    # lists Ollama local/cloud models and routes
+│   └── external-stats.sh     # aggregates .fable-lite/runs/ per model
 ├── examples/
 │   └── fable-lite.config.json
 ├── hooks/
-│   ├── hooks.json            # SessionStart reminder + PreToolUse Agent guard
+│   ├── hooks.json            # SessionStart reminder + PreToolUse guards
 │   ├── session-start.sh
 │   ├── agent-guard.sh        # denies Agent calls for routed roles / strict mode
-│   ├── edit-guard.sh         # strict: denies Edit/Write outside .fable-lite/
-│   ├── bash-guard.sh         # strict: denies test/build/lint runs in-session
-│   └── strict-common.sh
+│   ├── edit-guard.sh         # strict: denies Edit/Write to project code
+│   ├── bash-guard.sh         # strict: denies test/build runs and code-writing Bash
+│   └── strict-common.sh      # shared config load + project-path / write-bypass helpers
 ├── README.md
 └── LICENSE
 ```

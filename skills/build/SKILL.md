@@ -33,7 +33,7 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
    - `[OPUS]` → `subagent_type: "fable-lite:opus-implementer"`, unless `external.routes.opus` is set, then the external runner with that model
    - `[EXT:<model>]` → the external runner with that model
    - `[FABLE]` → do it here, in this session, now
-   External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `fable-lite-run --model <model> --brief <file>` (in the background when more than one). External briefs always carry a typed Steps section. Its stdout is the agent report; audit it exactly like an Agent result.
+   External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `fable-lite-run --model <model> --brief <file>`. For a whole wave of external items, write all briefs, then dispatch them together with `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`); it runs them in parallel and returns one combined report, so you audit the wave from a single tool result instead of one turn per item. External briefs always carry a typed Steps section. Audit each report exactly like an Agent result.
    If two items in the same wave list overlapping files, run the second after the first, or give both `isolation: "worktree"` and merge afterward.
 
 4. **Audit each result as it arrives.** Follow the audit checklist. Read the diff, not the transcript. Then:

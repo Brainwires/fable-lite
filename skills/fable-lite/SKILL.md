@@ -92,6 +92,7 @@ cat .fable-lite/config.json 2>/dev/null
    ```
    Use `run_in_background: true` when dispatching more than one, or when the item will take more than a minute; the completion notification carries the report. Stdout is the agent's report in the standard format, so audit it exactly like an Agent result.
 3. `fable-lite-models` lists the models the endpoint offers and the current routes.
+4. For a whole wave, write every brief then run `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`) once: it runs the items in parallel and returns one combined report, cutting orchestrator turns. `fable-lite-stats` reports how much has been offloaded per model.
 
 Everything else (brief discipline, audit, escalation) is unchanged from Anthropic subagents. Two adjustments:
 

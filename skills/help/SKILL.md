@@ -18,6 +18,7 @@ Print the following to the user, adapted lightly to the current context if a pla
 - `/fable-lite:delegate <task> [--sonnet|--opus|--fable]` — one-off: score, brief, dispatch, audit, report.
 - `/fable-lite:audit [diff-target]` — Fable-tier review of the current changes with the verifier.
 - `/fable-lite:external <model> <task>` — run one item on a non-Anthropic model (Ollama local/cloud or any Anthropic-compatible endpoint). `/fable-lite:external list` shows models and routes.
+- `/fable-lite:stats` — show runs, turns, and tokens offloaded to each external model.
 - `/fable-lite:help` — this.
 
 **Agents** (usable directly with the Agent tool as `fable-lite:<name>`)
