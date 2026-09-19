@@ -36,7 +36,7 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
    External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `fable-lite-run --model <model> --brief <file>`. For a whole wave of external items, write all briefs, then dispatch them together with `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`); it runs them in parallel and returns one combined report, so you audit the wave from a single tool result instead of one turn per item. External briefs always carry a typed Steps section. Audit each report exactly like an Agent result.
    If two items in the same wave list overlapping files, run the second after the first, or give both `isolation: "worktree"` and merge afterward.
 
-4. **Audit each result as it arrives.** Follow the audit checklist. Read the diff, not the transcript. Then:
+4. **Present the diff for audit.** The human is the primary auditor. Show a clean `git diff` (or `git diff --stat` plus the notable hunks) and say what each phase changed. If `external.audit` is `"lite"`, first dispatch the auditor (`fable-lite-run --role auditor --model <routed auditor> --brief .fable-lite/briefs/audit-<slug>.md`) and fold its Fixed/Flags into what you show. Do not spend premium tokens re-deriving the implementation. When something is clearly wrong against the brief, then:
    - Accept → set status `done`
    - Send back → write a fix brief quoting the exact miss, re-dispatch to the same agent. Second miss on the same item escalates one tier (Sonnet → Opus → Fable).
    - External model fails audit twice → escalate to the Anthropic tier above (`opus-implementer`, or Fable), not to another external model.
@@ -46,13 +46,13 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and 
 
 5. **Between waves**, re-read `git diff --stat`. If items in the wave changed the assumptions of later items, update those briefs before dispatching.
 
-6. **After the last wave**, dispatch `fable-lite:verifier` once for the full relevant suite. Do not dispatch a verifier per item; implementers run their own targeted checks and the audit reads their output. If red, batch all failures into one fix brief where they share a cause or area, and route it.
+6. **After the last phase**, dispatch the verifier once for the full relevant suite (route it externally if configured). Implementers run their own targeted checks; do not verify per item. If red, brief the failures back to the phase's engine.
 
 7. **Report to the user.** What changed (files, one line each), what was verified and how, anything blocked or skipped, and the routing summary: how many items ran on Sonnet, Opus, and Fable, and how many were escalated.
 
 ## Rules
 
 - Never commit or push. The user decides that.
-- Do not implement a `[SONNET]` or `[OPUS]` item yourself because it looks quick. That is the exact cost this plugin exists to avoid. Brief it.
-- Do read every diff you accept. Delegation without audit is not cheaper, it is deferred.
-- Do not multiply agents. A send-back goes to the same agent with a short fix brief. If two items in a wave turn out to be tightly coupled, merge them into one brief before dispatch instead of running two agents that will step on each other.
+- Delegate whole phases, not tiny items, and only when the work is long-running. A quick change is cheaper done inline than briefed and reviewed; do it inline.
+- Present the diff to the human, who is the primary auditor. Do not spend premium tokens re-deriving the implementation. If `external.audit` is `"lite"`, run the auditor first and fold in its report.
+- Do not multiply agents. Concurrent phases run only when they do not overlap; rarely more than 2 to 4 at once. A fix goes back to the phase's own engine.

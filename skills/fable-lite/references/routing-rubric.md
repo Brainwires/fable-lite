@@ -1,5 +1,7 @@
 # Routing rubric
 
+**First question: is this long enough to offload at all?** Delegation pays off only for long-running work; a small or quick change is cheaper done inline on the premium session (writing a brief and reviewing the result costs about as much premium as just doing it — measured). So: quick change → inline. Substantial, multi-step, or long-running → make it a phase and offload it. The axes below size and route a phase once you have decided it is worth offloading; they are not a reason to delegate something small.
+
 Score each work item on five axes, 0 to 2 each. Sum the score.
 
 | Axis | 0 | 1 | 2 |

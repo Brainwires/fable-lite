@@ -2,9 +2,18 @@
 
 **Spend Fable where it matters.**
 
-A Claude Code plugin that keeps your Fable session on the work that needs a top-tier model (understanding, planning, design decisions, risky changes, and auditing) and routes everything else to Opus or Sonnet subagents chosen by complexity.
+A Claude Code plugin that keeps deep reasoning (understanding, planning, design decisions) on your premium session — Fable or Opus — and offloads long-running implementation to one agent per phase, on Opus or on an external model (Ollama local or cloud) that is entirely off your Anthropic usage cap.
 
-Most tokens in a coding session go to work that does not need the best model: finding files, typing out a change whose shape is already decided, running tests, updating docs. fable-lite turns that observation into a discipline, with commands and agents that make the cheap path the easy path.
+The premium model's value is thinking, not typing. Once the approach is decided, executing it does not need the best model. fable-lite plans on the premium session, hands each phase of the plan to one long-running agent, and gives you back a clean diff to audit.
+
+### Where the savings come from, honestly
+
+Offloading pays off for **long-running work**, not small tasks. Delegation has a fixed premium cost the implementation does not: writing the brief, and reviewing the result. Measured on this project (same model both sides, comparing token counts):
+
+- A **one-liner**: delegate ≈ inline. A wash.
+- A **class plus tests**: inline cost ~1,400 premium output tokens; delegating and auditing it thoroughly cost ~3,900. Delegation lost, because auditing code you did not write costs about as much as writing it.
+
+So this is not "offload everything." Small or quick changes stay inline on the premium session; long-running phases get offloaded, where the implementation cost dwarfs the brief and the win is real. And **you are the primary auditor** — the plugin hands you one diff rather than burning premium tokens re-deriving what the agent did. An opt-in lite audit (a cheap checks-and-fixes pass) is available if you want a first pass; it does not replace your review.
 
 ## How it works
 
@@ -24,13 +33,13 @@ Most tokens in a coding session go to work that does not need the best model: fi
                                 (Sonnet)    (Opus)
 ```
 
-1. **Fable understands the request** and asks scouts for the context it needs instead of reading the codebase itself.
-2. **Fable decomposes the work** into items and scores each one on a five-axis rubric (files touched, exemplar exists, judgment required, blast radius, spec clarity). The score picks the tier.
-3. **Fable writes a self-contained brief per item** and dispatches independent items in parallel.
-4. **Fable audits every diff** that comes back. Accept, send back with a precise fix brief, or take over. Two misses escalate one tier.
-5. **A verifier runs the suite** and Fable reports to you: what changed, what was verified, what ran where.
+1. **The premium session understands the request** and asks scouts for context instead of reading the whole codebase itself.
+2. **It plans on the premium session** and decomposes the work into 2 to 4 non-overlapping phases. Quick changes are done inline, not delegated.
+3. **Each phase goes to one long-running agent**, on Opus or an external model. Non-overlapping phases run concurrently (at most ~4 at once, matching the phase count).
+4. **You audit the diff.** The plugin presents one clean diff; you own acceptance. Optionally, an opt-in lite auditor does a cheap checks-and-fixes pass first.
+5. **A verifier runs the suite** once at the end, and the session reports what changed and what ran where.
 
-The routing rule in one line: **if a competent engineer could do it from a ten-line brief without asking a question, Fable should not be the one doing it.**
+The rule in one line: **the premium model plans and you audit; the long-running typing in between happens somewhere cheaper.**
 
 ## Install
 
@@ -225,16 +234,16 @@ Subagents are cheaper per token than Fable, but each spawn pays a fixed orientat
 - A single grep or file read is done in-session, never briefed
 - Parallelism is used for genuinely independent items, never manufactured by splitting one agent's work into several
 
-## What stays on Fable, always
+## What stays on the premium session
 
 - Understanding the request and resolving ambiguity with you
-- Decomposition, sequencing, architecture, naming public things
-- Anything touching auth, secrets, payments, migrations, deletion, concurrency, or public API contracts
+- Planning: decomposition into phases, sequencing, architecture, naming public things
+- Design decisions for anything touching auth, secrets, payments, migrations, deletion, concurrency, or public API contracts
 - Debugging when the root cause is unknown
-- Auditing every delegated result before it is accepted
-- Final integration and the summary you read
+- Quick or small changes (delegating them saves nothing)
+- Handing you a clean diff and the summary you read
 
-Delegation without audit is not cheaper, it is deferred. Fable reads every diff it accepts.
+Auditing is yours: you read the diff and own acceptance. The opt-in lite auditor is a convenience that fixes clear defects and flags risky code for you; it is not a claim that the AI audits everything. If you want the hard guarantee that the session never implements, turn on strict mode and accept the premium cost it adds on small work.
 
 ## The skill, without the commands
 
@@ -252,8 +261,11 @@ Add `.fable-lite/` to your `.gitignore` if you do not want these committed (keep
 
 | Setting | Effect |
 |---|---|
-| `FABLE_LITE_QUIET=1` | Suppress the session-start routing reminder. |
-| Agent `model` override | The agents pin `opus` and `sonnet` in their frontmatter. Pass `model` on an Agent call for a one-off override, or edit `agents/*.md` in your local copy to change the defaults (for example, `haiku` for scout). |
+| `external.routes` | Map roles (`opus`, `sonnet`, `scout`, `verifier`, `auditor`) to external models. A routed role runs via `fable-lite-run` instead of an Agent call. |
+| `external.audit` | `"off"` (default): you audit the diff. `"lite"`: after a phase, a cheap `auditor` agent does a checks-and-fixes pass and reports what it fixed and flagged, before your review. |
+| `external.strict` | `true`: hooks enforce the split — the session never implements; every phase and check goes external. Adds premium cost on small work in exchange for the hard guarantee. |
+| `FABLE_LITE_QUIET=1` | Suppress the session-start reminder. |
+| Agent `model` override | The Anthropic agents pin `opus`/`sonnet` in frontmatter; pass `model` on an Agent call to override, or edit `agents/*.md` locally. |
 
 ## Layout
 
@@ -265,8 +277,9 @@ fable-lite/
 ├── agents/
 │   ├── scout.md              # Sonnet, read-only
 │   ├── sonnet-implementer.md # Sonnet
-│   ├── opus-implementer.md   # Opus
-│   └── verifier.md           # Sonnet, read-only
+│   ├── opus-implementer.md   # Opus, one phase to completion
+│   ├── verifier.md           # Sonnet, read-only
+│   └── auditor.md            # opt-in lite audit: checks and fixes
 ├── skills/
 │   ├── fable-lite/           # auto-loading routing skill
 │   │   ├── SKILL.md

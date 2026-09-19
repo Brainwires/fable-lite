@@ -1,130 +1,77 @@
 ---
 name: fable-lite
-description: This skill should be used whenever the session is running on Fable (or another premium model) and the user asks for implementation work, a feature, a fix, a refactor, or a multi-step change. It routes work by value: the Fable session keeps planning, judgment, and auditing, and delegates well-specified implementation to Opus or Sonnet subagents, or to Ollama/external models when routes are configured. Also triggers on "fable-lite", "delegate this", "don't burn Fable on this", "route to sonnet/opus", or "use the cheap model for the grunt work".
-allowed-tools: Bash(fable-lite-run *), Bash(fable-lite-models *), Bash(cat .fable-lite/*), Bash(mkdir -p .fable-lite/*)
+description: This skill should be used whenever the session is running on a premium model (Fable or Opus) and the user asks for a feature, a fix, a refactor, or any multi-step implementation. It keeps deep reasoning (understanding, planning, judgment) on the premium session and offloads long-running implementation to one agent per phase, on Opus or on an external model (Ollama local or cloud) when routes are configured. Also triggers on "fable-lite", "delegate this", "don't burn Fable on this", "run the plan", or "offload the grunt work".
+allowed-tools: Bash(fable-lite-run *), Bash(fable-lite-batch *), Bash(fable-lite-models *), Bash(fable-lite-stats *), Bash(cat .fable-lite/*), Bash(mkdir -p .fable-lite/*)
 ---
 
-# fable-lite: spend Fable where it matters
+# fable-lite: spend the premium model on thinking, not typing
 
-Fable is the most capable model available and the most expensive. Most of the tokens in a typical coding session are spent on work that does not need it: reading files to find things, typing out a change whose shape is already decided, running tests, editing docs. fable-lite is a routing discipline for that split.
+The premium session (Fable, or Opus) is expensive and capped. Its value is in reasoning: understanding the request, resolving ambiguity, designing the approach, and deciding what is risky. Implementation — once the approach is decided — does not need it. fable-lite keeps the reasoning on the premium session and offloads the long-running implementation to one agent per phase, on a cheaper Anthropic model or, when routes are configured, on an external model (Ollama) that is entirely off your Anthropic usage cap.
 
-**The Fable session is the orchestrator.** It does the thinking that benefits from being done well: understanding the request, finding the ambiguity, designing the approach, deciding what is risky, and checking the result. Everything else is written up as a brief and handed to a subagent on a cheaper model.
+## Where the savings actually come from (measured, so no misrepresentation)
 
-## Roles
+Offloading pays off for **long-running work**, not for small tasks, and here is the honest reason. Delegation has a fixed premium cost the implementation does not: writing the brief, and reviewing what comes back. Measured on this project (same model both sides, so the comparison is token counts):
 
-| Role | Who | Model | Does |
-|---|---|---|---|
-| Orchestrator | this session | Fable | plan, decide, brief, audit, integrate, talk to the user |
-| `scout` | subagent | Sonnet | read-only search and summary so Fable reads less |
-| `sonnet-implementer` | subagent | Sonnet | small, mechanical, pattern-following edits |
-| `opus-implementer` | subagent | Opus | multi-file or judgment-bearing implementation from a clear spec |
-| `verifier` | subagent | Sonnet | run tests, typecheck, lint, build; report faithfully |
+- A **one-liner**: delegating cost about the same premium tokens as doing it inline. A wash.
+- A **medium task** (a class plus its tests): doing it inline cost ~1,400 premium output tokens; delegating it and auditing the result thoroughly cost ~3,900. Delegation lost, because auditing code you did not write costs about as much as writing it.
 
-| external | nested `claude -p` | any Anthropic-API-compatible endpoint (Ollama local or cloud by default) | runs a Sonnet-tier or Opus-tier item on a non-Anthropic model when a route is configured |
+So the split is not "offload everything." It is:
 
-Agents are invoked with the Agent tool using `subagent_type` set to the plugin-namespaced name, for example `fable-lite:sonnet-implementer`. If the namespaced name is not accepted, use the bare name.
+- **Small or quick changes: do them inline** on the premium session. Delegating them saves nothing and adds latency.
+- **Long-running phases: offload them** to one agent each. Here the implementation cost dwarfs the brief, and the win is real — especially on external models, where that implementation runs off your cap entirely.
 
-## The routing rule
+"Offload everything except orchestration and auditing" is the ideal target, not an absolute. The break-even is task length, not a line count.
 
-Before doing any piece of work yourself, ask: **does this step need Fable?**
+## The execution model
 
-**Engine resolution comes first.** A tier names a level of work, not a process. Before every implementer dispatch, resolve the engine: if the session-start context or `.fable-lite/config.json` lists an external route for that tier, the engine is `fable-lite-run` with that model, and calling `fable-lite:sonnet-implementer` or `fable-lite:opus-implementer` for it is a routing error. Only unrouted tiers use the Agent tool.
+1. **Plan on the premium session.** Deep reasoning: understand, resolve ambiguity, design. Produce a plan of **2 to 4 non-overlapping phases** — a phase is a coherent chunk one agent can run to completion. `/fable-lite:plan` writes this to `.fable-lite/plan.md`.
+2. **Execute each phase with one long-running agent.** Not a stream of tiny per-item briefs — one agent per phase, running the whole phase. Phases that do not touch the same files run **concurrently**; since there are rarely more than 2 to 4 phases, that is the most agents that should run at once (the batch runner caps concurrency at 4). Overlapping phases run in sequence.
+3. **Audit.** You, the human, are the primary auditor — you read the diff and own acceptance. The premium session's job is to hand you one clean, coherent diff, not to burn cap tokens re-deriving what the agent did. Optionally enable a **lite audit** (below) for a cheap checks-and-fixes first pass.
 
-**Keep on Fable:**
-- Understanding the request and resolving ambiguity with the user
-- Decomposing into work items and sequencing them
-- Architecture and interface design, naming public things
-- Anything touching auth, secrets, payments, data migrations, deletion, concurrency, or public API contracts
-- Debugging when the root cause is unknown
-- Auditing every delegated result before accepting it
-- Final integration and the user-facing summary
+## Roles and engines
 
-**Delegate to `opus-implementer`:**
-- Multi-file changes with a defined interface and acceptance criteria
-- Refactors covered by tests
-- Bug fixes where Fable has already identified the cause
-- Writing tests for behavior that exists and is described
+| Role | Runs on | Does |
+|---|---|---|
+| Orchestrator | this premium session | plan, decide, hand off phases, present the diff, talk to you |
+| phase executor | one agent per phase: `opus-implementer`, or an external model via `fable-lite-run` | run a whole phase to completion from the plan |
+| `scout` | Sonnet / external | read-only search so the premium session reads less |
+| `verifier` | Sonnet / external | run tests, typecheck, build; report faithfully |
+| `auditor` (opt-in) | Sonnet / external | lite checks-and-fixes pass over the diff before you audit |
 
-**Delegate to `sonnet-implementer`:**
-- Single-file, mechanical edits
-- Pattern copies where an exemplar file can be named
-- Renames, config, flags, docstrings, README, comments
-- Anything a competent engineer could do from a ten-line brief without asking a question
+External routes: if `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) sets `external.routes`, a role runs on the named external model via `fable-lite-run --role <role>` instead of the Agent tool, and a PreToolUse hook enforces it. `fable-lite-models` lists what is available.
 
-**Delegate to `scout`:** any question of the form "where is", "list all", "how does X work", "find an exemplar".
+## Lite audit (opt-in: checks and fixes)
 
-**Delegate to `verifier`:** any test, lint, typecheck, or build run whose output Fable only needs as a summary.
-
-When unsure between Sonnet and Opus, score the item with `references/routing-rubric.md`. When unsure between Opus and Fable, keep it on Fable. A wrong delegation costs a retry. A wrong self-assignment costs Fable tokens quietly, every time.
-
-## The loop
-
-1. **Understand.** Read the request. If context is needed, dispatch `scout` rather than reading files directly. Read only what scout points at.
-2. **Plan.** Break the work into items. Tag each item `[FABLE]`, `[OPUS]`, or `[SONNET]`. Note dependencies. For anything non-trivial, show the plan to the user before dispatching. `/fable-lite:plan` produces this.
-3. **Baseline.** For changes that touch tested code, dispatch `verifier` once to record what is green before work begins.
-4. **Brief and dispatch.** Write one brief per item using `references/brief-template.md`. Independent items go out in parallel, in one message. Items that touch overlapping files run sequentially or in separate worktrees (`isolation: "worktree"`).
-5. **Audit.** When a result comes back, audit it on Fable using `references/audit-checklist.md`. Read the diff, not the transcript. Accept, send back with a fix brief, or take over.
-6. **Verify.** Dispatch `verifier` for the full relevant suite after the last item lands.
-7. **Report.** Tell the user what changed, what was verified, and what was routed where.
-
-## Briefs are the whole game
-
-Subagents start with an empty context. They do not know what the user said, what Fable read, or what was decided. A brief that assumes shared context produces a wrong result and a retry, which costs more than writing the brief properly. Every brief carries: goal, exact files, an exemplar when one exists, typed numbered steps for Sonnet-tier work, explicit scope boundaries, the definition of done, and the required report format. The cheap model is asked to type, not to design; if the steps cannot be written without making a decision, make the decision first. The template in `references/brief-template.md` is the minimum.
-
-## External models (Ollama and friends)
-
-If `.fable-lite/config.json` (or `~/.claude/fable-lite.json`) has `external.routes`, a role listed there runs on the named external model instead of the Anthropic subagent: `routes.sonnet` replaces `sonnet-implementer`, `routes.opus` replaces `opus-implementer`, `routes.scout` replaces `scout` (use `--role scout`), `routes.verifier` replaces `verifier` (use `--role verifier`). A PreToolUse hook denies Agent calls for routed roles, so this is enforced, not advisory.
-
-**Strict mode** (`external.strict: true`): hooks block the Agent tool, Edit/Write outside `.fable-lite/`, and test/build/lint commands. The session does orchestration and auditing only; every delegated task, including read-only scouting and test runs, goes through `fable-lite-run`. Never implement a change inline because it looks quick. Escalation after two failed audits means taking the item over: create `.fable-lite/takeover` containing the reason, make the edit, remove the file. The session-start context says when strict mode is on.
-
-Check for routes once, at the start of the task:
+By default the human audits and no premium tokens go to a heavy AI audit. If you want a cheap first pass, set `external.audit` to `"lite"` in your config. After a phase (or the whole plan) executes, dispatch the auditor:
 
 ```
-cat .fable-lite/config.json 2>/dev/null
+fable-lite-run --role auditor --model <cheap or external model> --brief .fable-lite/briefs/audit-<slug>.md --cwd <dir>
 ```
 
-**Dispatching from a normal conversation** (no slash command needed). `fable-lite-run` is on PATH whenever the plugin is installed; it is the external equivalent of an Agent call:
+The auditor reviews the diff against the brief, **fixes only clear, unambiguous defects**, and reports what it checked, what it fixed, and what it flagged for you. It does not redesign, expand scope, or touch risky code (auth, data, money, deletion, concurrency, migrations, public APIs) — those it flags for you. It is a convenience, not a replacement for your review. Default is `"off"`: you audit.
 
-1. Write the brief to `.fable-lite/briefs/<slug>.md` (create the directory). Typed numbered Steps are required.
-2. Run it with the Bash tool:
-   ```
-   fable-lite-run --model <model> --brief .fable-lite/briefs/<slug>.md [--role scout|verifier] [--cwd <worktree>]
-   ```
-   Use `run_in_background: true` when dispatching more than one, or when the item will take more than a minute; the completion notification carries the report. Stdout is the agent's report in the standard format, so audit it exactly like an Agent result.
-3. `fable-lite-models` lists the models the endpoint offers and the current routes.
-4. For a whole wave, write every brief then run `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`) once: it runs the items in parallel and returns one combined report, cutting orchestrator turns. `fable-lite-stats` reports how much has been offloaded per model.
+## Dispatching
 
-Everything else (brief discipline, audit, escalation) is unchanged from Anthropic subagents. Two adjustments:
+`fable-lite-run` and `fable-lite-batch` are on PATH whenever the plugin is installed.
 
-- External models always get the Sonnet-tier brief discipline: typed numbered Steps, exemplar named, no open decisions, even when routed for Opus-tier work.
-- Escalation from an external model goes to the Anthropic tier above it (or Fable), never to a different external model.
+- **One phase:** write its brief to `.fable-lite/briefs/<slug>.md` (typed steps; the agent starts with empty context and knows only the brief), then `fable-lite-run --model <model> --brief <file> --cwd <dir>`. Run in the background if it will take more than a minute.
+- **Concurrent phases:** write each brief, then `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`) once. It runs them in parallel (cap 4), returns one combined report, and writes each run's JSON to `.fable-lite/runs/`.
+- `fable-lite-stats` reports how much has been offloaded per model, so the savings are measurable.
 
-`/fable-lite:external <model> <task>` runs one item on a specific model without touching routes. `/fable-lite:external list` shows what is available.
+A phase brief still carries goal, exact files, an exemplar when one exists, typed steps, scope boundaries, and the definition of done — see `references/brief-template.md`. A phase is larger than a single edit, but the brief is still explicit: the agent implements the decided approach, it does not redesign.
 
-## Agent budget: batch, don't sprawl
+## Strict mode
 
-Every subagent spawn has a fixed cost before any work happens: it reads CLAUDE.md, orients in the repo, and re-discovers conventions. Ten small agents cost far more than two well-briefed ones doing the same work. Rules:
+`external.strict: true` makes the split enforced rather than advisory: hooks block the Agent tool, block editing project code, and block test/build runs on the premium session, so every phase and every check goes to an external model. Small inline changes are blocked too, so strict mode trades some premium tokens (and latency) on small work for a hard guarantee that the session never implements. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts the edit and Bash guards until removed. Use strict when your priority is a hard cap guarantee; leave it off to keep small changes inline (usually cheaper).
 
-- **One scout per plan, not one per question.** Give the scout a numbered list of everything Fable needs to know. Dispatch a second scout only if the first answer opens a new area.
-- **Merge items that share a tier and a neighborhood.** Three Sonnet edits in the same package are one brief with three numbered steps, not three agents.
-- **Aim for two to five items per plan.** A plan with ten items is usually a plan with three items that were split too finely. A single brief may run up to a page.
-- **Verify once, at the end.** Implementers already run their own checks. Dispatch `verifier` for the baseline (only when the suite is not trivially fast to run in-session) and once after the last item. Not after every item.
-- **Do not dispatch an agent for a one-line lookup.** A single grep or a single file read is cheaper done here than briefed.
-- **Parallel is not free.** Run independent items in parallel to save wall-clock time, but do not create parallelism by splitting work that one agent could do sequentially.
+## What this is and is not
 
-## Escalation
-
-- Any implementer redesigns instead of following the brief: re-brief the **same** tier as typed, numbered steps. Redesign means the brief left a decision open. Escalate only if typed steps also fail.
-- `sonnet-implementer` returns BLOCKED or fails audit twice: re-brief to `opus-implementer`.
-- `opus-implementer` returns BLOCKED or fails audit twice: Fable takes the item over.
-- Any agent reports a conflict between the brief and the code: Fable decides. Do not re-dispatch the same brief.
-
-## What this is not
-
-fable-lite does not make Fable lazy. Fable still reads every diff it accepts and owns every decision. It stops Fable from doing typing that a brief could have described, and from reading files a scout could have summarized.
+- It **does** move long-running implementation off the premium session, and off your Anthropic cap when routed externally.
+- It **does not** claim the AI audits everything. By default you audit; the lite auditor is opt-in and bounded.
+- It **does not** delegate small changes — those stay inline, because delegating them costs as much premium as doing them.
 
 ## References
 
-- `references/routing-rubric.md` — the scoring rubric for Sonnet vs Opus vs Fable
-- `references/brief-template.md` — the delegation brief template and a filled example
-- `references/audit-checklist.md` — what Fable checks before accepting a result
+- `references/routing-rubric.md` — deciding whether a task is long enough to offload, and sizing phases
+- `references/brief-template.md` — the phase brief template and a filled example
+- `references/audit-checklist.md` — what to check when you (or the lite auditor) review a diff

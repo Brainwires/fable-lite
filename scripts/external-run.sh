@@ -106,6 +106,8 @@ case "$ROLE" in
                DEFAULT_TOOLS="Read,Glob,Grep,Bash(git log *),Bash(git grep *),Bash(ls *),Bash(cat *),Bash(wc *)";;
   verifier)    AGENT_FILE="$PLUGIN_ROOT/agents/verifier.md"
                DEFAULT_TOOLS="Read,Glob,Grep,Bash";;
+  auditor)     AGENT_FILE="$PLUGIN_ROOT/agents/auditor.md"
+               DEFAULT_TOOLS="Read,Glob,Grep,Edit,Bash";;
   *) echo "external-run: unknown role $ROLE" >&2; exit 3;;
 esac
 TOOLS="${TOOLS:-$(cfg external.allowedTools)}"
