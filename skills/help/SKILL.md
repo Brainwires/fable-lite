@@ -13,8 +13,8 @@ Print the following to the user, adapted lightly to the current context if a pla
 **Routing rule:** Fable plans, decides, and audits. Opus implements multi-file or judgment-bearing changes from a clear spec. Sonnet does small, mechanical, pattern-following edits. Read-only searching goes to a Sonnet scout. Test runs go to a Sonnet verifier.
 
 **Commands**
-- `/fable-lite:plan <task>` — Fable decomposes the task and tags each item SONNET / OPUS / FABLE. Writes `.fable-lite/plan.md`.
-- `/fable-lite:build [items]` — dispatches the plan wave by wave, audits every result, updates status.
+- `/fable-lite:plan <task>` — the premium session decomposes the task into 2-4 non-overlapping phases. Writes `.fable-lite/plan.md`.
+- `/fable-lite:build` — runs each phase with one long-running agent (non-overlapping phases in parallel), then hands you one diff to audit and runs the verifier once.
 - `/fable-lite:delegate <task> [--sonnet|--opus|--fable]` — one-off: score, brief, dispatch, audit, report.
 - `/fable-lite:audit [diff-target]` — Fable-tier review of the current changes with the verifier.
 - `/fable-lite:external <model> <task>` — run one item on a non-Anthropic model (Ollama local/cloud or any Anthropic-compatible endpoint). `/fable-lite:external list` shows models and routes.

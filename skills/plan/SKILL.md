@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Produce a fable-lite work plan for a task. Fable does the understanding and decomposition, tags each work item with the model tier that should implement it (FABLE, OPUS, SONNET), and writes the plan to .fable-lite/plan.md for /fable-lite:build to execute.
+description: Produce a fable-lite work plan for a task. The premium session does the understanding and decomposition into 2-4 non-overlapping phases, tags each phase with the engine tier that should execute it, and writes the plan to .fable-lite/plan.md for /fable-lite:build to run.
 argument-hint: <task description>
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Write, Agent
@@ -10,7 +10,7 @@ allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdi
 
 Task: $ARGUMENTS
 
-This is Fable-tier work. Do it well, and do it once. Read `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/routing-rubric.md` before tagging items.
+This is premium-session work: plan well, once. Read `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/routing-rubric.md` before sizing phases.
 
 ## Steps
 
@@ -20,9 +20,9 @@ This is Fable-tier work. Do it well, and do it once. Read `${CLAUDE_PLUGIN_ROOT}
 
 3. **Decompose into phases.** Break the work into **2 to 4 non-overlapping phases**, not a stream of tiny items. A phase is a coherent chunk one agent runs to completion (e.g. "data layer + its tests", "the endpoint + wiring"). Merge small related work into the phase it belongs to; do not delegate one-line changes at all (do those inline). Phases that touch the same files must be sequenced; phases that do not can run concurrently. Rarely more than 4 phases, which is also the most agents that should run at once.
 
-4. **Score and tag.** Score each item with the rubric. Tag it `[SONNET]`, `[OPUS]`, or `[FABLE]`. Tags name the tier, not the engine: if `.fable-lite/config.json` routes a tier to an external model, build will run it there. To pin one item to a specific external model, tag it `[EXT:<model>]`, for example `[EXT:kimi-k2.7-code:cloud]`; such items need a fully typed Steps section in their brief. Items tagged `[FABLE]` should be rare: usually they are a design decision Fable makes now, which then unlocks Opus or Sonnet items. Make those decisions in this step and write them down.
+4. **Size and tag each phase.** Score each phase with the rubric to pick its tier and tag it `[SONNET]` or `[OPUS]` (or `[EXT:<model>]` to pin a specific external model). The tag names the tier; if `.fable-lite/config.json` routes that tier externally, build runs it there. Design decisions are made here, during planning, and written under Decisions — they are not a phase. A phase that must stay on the premium session (a genuinely risky change you will hand-write) is rare; tag it `[FABLE]` and say why.
 
-5. **Sequence.** Mark dependencies. Group independent items into waves that can run in parallel. Note items that touch overlapping files so build runs them sequentially or in worktrees.
+5. **Sequence.** Mark each phase's dependencies. Phases that do not touch the same files can run concurrently; phases that do must be ordered. Note the overlaps so build sequences them.
 
 6. **Write the plan** to `.fable-lite/plan.md` in the project root using the format below. Create the directory if needed. Then show the plan to the user in the conversation and stop. Do not start building. The user runs `/fable-lite:build` when ready.
 
@@ -47,32 +47,26 @@ Request: <the user's request, verbatim or lightly condensed>
 - Key files: path — role
 - Exemplars: path — what pattern it models
 
-## Items
+## Phases
 
-### 1. [SONNET] <title>
+### 1. [OPUS] <title>
 Status: todo
 Depends on: none
 Files: path/a.ext, path/b.ext
-Brief: <two to six lines an implementer needs. Goal, exact change, exemplar, definition of done. Build expands this into the full brief template.>
+Brief: <the goal, the exact changes, the exemplar, and the definition of done for the whole phase. Build expands this into the full brief template with typed steps.>
 
-### 2. [OPUS] <title>
+### 2. [SONNET] <title>
 Status: todo
 Depends on: 1
 Files: ...
 Brief: ...
 
-### 3. [FABLE] <title>
-Status: todo
-Depends on: 2
-Note: <why this stays on Fable, usually "audit and integrate" or a blast-radius-2 change>
+## Concurrency
+- Phases 1 and 2 touch different files → can run together.
+- (Otherwise: list which phases must run in sequence and why.)
 
-## Waves
-- Wave 1: items 1, 4 (independent)
-- Wave 2: item 2 (needs 1)
-- Wave 3: item 3
-
-## Routing summary
-Sonnet: N items · Opus: N items · Fable: N items
+## Offload summary
+Opus tier: N phases · Sonnet tier: N phases · premium session: N phases
 ```
 
 Status values are `todo`, `in-progress`, `done`, `blocked`, `skipped`.

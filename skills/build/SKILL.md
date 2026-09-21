@@ -1,14 +1,14 @@
 ---
 name: build
-description: Execute the current fable-lite plan. Dispatches each work item to the model tier the plan assigned, in dependency order and in parallel where possible, audits every result on Fable, and updates item status in .fable-lite/plan.md.
-argument-hint: [item numbers to run, e.g. "1 2" — default all pending]
+description: Execute the current fable-lite plan. Runs each phase with one long-running agent (Opus or an external model), non-overlapping phases in parallel, then presents one combined diff for the human to audit and runs the verifier once. Updates phase status in .fable-lite/plan.md.
+argument-hint: [phase numbers to run, e.g. "1 2" — default all pending]
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(fable-lite-run *), Bash(fable-lite-models *), Edit, Write, Agent
+allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(fable-lite-run *), Bash(fable-lite-batch *), Bash(fable-lite-models *), Bash(fable-lite-stats *), Edit, Write, Agent
 ---
 
 # /fable-lite:build
 
-Selected items: $ARGUMENTS (empty means every item whose status is `todo`)
+Selected phases: $ARGUMENTS (empty means every phase whose status is `todo`)
 
 ## External routes (if configured)
 
@@ -22,37 +22,28 @@ Selected items: $ARGUMENTS (empty means every item whose status is `todo`)
 
 If there is no plan, tell the user and stop.
 
-Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md` and `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/audit-checklist.md`. Then, for each wave in order:
+Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md`. Work through the plan's phases in dependency order:
 
-1. **Baseline once, if it earns its keep.** Before the first wave, if the plan lists a test command and no baseline is recorded: run it directly here when it is fast (under a minute, short output), otherwise dispatch `fable-lite:verifier`. Note the result in the plan under Context as `Baseline: GREEN|RED (<summary>)`.
+1. **Baseline once, if it earns its keep.** Before the first phase, if the plan lists a test command and no baseline is recorded, run it directly here when it is fast, otherwise dispatch the verifier (external if routed). Record `Baseline: GREEN|RED (<summary>)` in the plan.
 
-2. **Brief every item in the wave.** Expand each item's short brief into the full template. Include the plan's Decisions and Context sections verbatim where relevant. The agent has no other context. Set status to `in-progress` in the plan file.
+2. **Brief each phase.** Expand the phase's plan entry into a full brief (`.fable-lite/briefs/<n>-<slug>.md`), including the plan's Decisions and Context verbatim where relevant. The agent starts with empty context and knows only the brief. Typed Steps are required. Set the phase status to `in-progress`.
 
-3. **Dispatch the wave in one message.** One Agent call per item:
-   - `[SONNET]` → `subagent_type: "fable-lite:sonnet-implementer"`, unless `external.routes.sonnet` is set, then the external runner with that model
-   - `[OPUS]` → `subagent_type: "fable-lite:opus-implementer"`, unless `external.routes.opus` is set, then the external runner with that model
-   - `[EXT:<model>]` → the external runner with that model
-   - `[FABLE]` → do it here, in this session, now
-   External runner: write the brief to `.fable-lite/briefs/<n>-<slug>.md`, then run `fable-lite-run --model <model> --brief <file>`. For a whole wave of external items, write all briefs, then dispatch them together with `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`); it runs them in parallel and returns one combined report, so you audit the wave from a single tool result instead of one turn per item. External briefs always carry a typed Steps section. Audit each report exactly like an Agent result.
-   If two items in the same wave list overlapping files, run the second after the first, or give both `isolation: "worktree"` and merge afterward.
+3. **Run each phase with one long-running agent.** Pick the engine from the phase's tier and the routes:
+   - tier routed externally, or tagged `[EXT:<model>]` → `fable-lite-run --model <model> --brief <file> --cwd <dir>` (background it if it will take more than a minute).
+   - tier not routed → the Agent tool with `subagent_type: "fable-lite:opus-implementer"` (or `sonnet-implementer` for a mechanical phase).
+   **Non-overlapping phases run concurrently:** write all their briefs, then dispatch them together with `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`) — one combined report, at most ~4 at once. Phases that touch the same files run in sequence.
 
-4. **Present the diff for audit.** The human is the primary auditor. Show a clean `git diff` (or `git diff --stat` plus the notable hunks) and say what each phase changed. If `external.audit` is `"lite"`, first dispatch the auditor (`fable-lite-run --role auditor --model <routed auditor> --brief .fable-lite/briefs/audit-<slug>.md`) and fold its Fixed/Flags into what you show. Do not spend premium tokens re-deriving the implementation. When something is clearly wrong against the brief, then:
-   - Accept → set status `done`
-   - Send back → write a fix brief quoting the exact miss, re-dispatch to the same agent. Second miss on the same item escalates one tier (Sonnet → Opus → Fable).
-   - External model fails audit twice → escalate to the Anthropic tier above (`opus-implementer`, or Fable), not to another external model.
-   - Redesigned instead of followed the brief → do not escalate. Re-dispatch to the same tier with a typed, numbered Steps section only. Escalate only if that also fails.
-   - Take over → fix it here, set status `done`, note "completed on Fable" in the item
-   - Agent reports BLOCKED with a real conflict → set status `blocked`, record the conflict, and decide: adjust the plan, or ask the user if the decision is theirs
+4. **Present the diff — you do not audit it, the human does.** When the phases return, show a clean `git diff` (or `git diff --stat` plus the notable hunks) and say what each phase changed. Do not spend premium tokens re-deriving the implementation. If `external.audit` is `"lite"`, first dispatch the auditor (`fable-lite-run --role auditor --model <routed auditor> --brief .fable-lite/briefs/audit-<n>.md --cwd <dir>`) and fold its Fixed/Flags into what you show. Set each accepted phase `done`.
 
-5. **Between waves**, re-read `git diff --stat`. If items in the wave changed the assumptions of later items, update those briefs before dispatching.
+5. **When a phase is clearly wrong against its brief** (you noticed, the lite auditor flagged it, or the agent reported BLOCKED): brief the fix back to the **same phase engine** as typed steps. A redesign (the agent chose an approach) is a brief-clarity failure — re-send typed steps, do not escalate. Two failures on the same phase: escalate to the Anthropic tier above (Opus, then take it over yourself under a `.fable-lite/takeover` marker). A real brief-vs-code conflict: adjust the plan, or ask the user if the decision is theirs; set status `blocked`.
 
-6. **After the last phase**, dispatch the verifier once for the full relevant suite (route it externally if configured). Implementers run their own targeted checks; do not verify per item. If red, brief the failures back to the phase's engine.
+6. **After the last phase**, dispatch the verifier once for the full relevant suite (external if routed). Do not verify per phase; executors run their own targeted checks. If red, brief the failures back to the owning phase's engine.
 
-7. **Report to the user.** What changed (files, one line each), what was verified and how, anything blocked or skipped, and the routing summary: how many items ran on Sonnet, Opus, and Fable, and how many were escalated.
+7. **Report to the user.** What changed (files, one line each), what the verifier said, anything blocked or skipped, and the offload summary (`fable-lite-stats`): how many phases ran on which engine.
 
 ## Rules
 
 - Never commit or push. The user decides that.
-- Delegate whole phases, not tiny items, and only when the work is long-running. A quick change is cheaper done inline than briefed and reviewed; do it inline.
-- Present the diff to the human, who is the primary auditor. Do not spend premium tokens re-deriving the implementation. If `external.audit` is `"lite"`, run the auditor first and fold in its report.
-- Do not multiply agents. Concurrent phases run only when they do not overlap; rarely more than 2 to 4 at once. A fix goes back to the phase's own engine.
+- Delegate whole phases, and only long-running ones. A quick change is cheaper done inline than briefed and reviewed; do it inline.
+- The human is the primary auditor. Present the diff; do not re-derive the work. The lite auditor is an opt-in pre-check, not a replacement.
+- Do not multiply agents. Concurrency is for non-overlapping phases only, rarely more than 2 to 4 at once. A fix goes back to the phase's own engine.

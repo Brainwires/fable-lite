@@ -18,19 +18,21 @@ So this is not "offload everything." Small or quick changes stay inline on the p
 ## How it works
 
 ```
-                      ┌──────────────────────────────────────────┐
-  you ──────────────► │  Fable session (orchestrator)            │
-                      │  understand · plan · decide · brief      │
-                      │  audit every result · integrate · report │
-                      └───┬─────────┬──────────┬───────────┬─────┘
-                          │         │          │           │
-                     read-only   small &    multi-file   run tests
-                     questions   mechanical  judgment    lint, build
-                          │         │          │           │
-                          ▼         ▼          ▼           ▼
-                       scout    sonnet-     opus-       verifier
-                      (Sonnet)  implementer implementer (Sonnet)
-                                (Sonnet)    (Opus)
+                   ┌───────────────────────────────────────────┐
+  you ───────────► │  premium session (Fable / Opus)           │
+                   │  understand · plan into phases · hand off  │
+                   │  present one diff · report                 │
+                   └──┬──────────┬───────────┬──────────┬───────┘
+                      │          │           │          │
+                 read-only   phase 1     phase 2     run tests
+                 research   (long-run)  (long-run)   at the end
+                      │          │           │          │
+                      ▼          ▼           ▼          ▼
+                   scout /    one agent   one agent   verifier
+                   research   per phase   per phase
+                   (allowed)  (Opus / external)      (Sonnet / external)
+
+  you audit the diff   ·   opt-in lite auditor can pre-check
 ```
 
 1. **The premium session understands the request** and asks scouts for context instead of reading the whole codebase itself.
@@ -70,50 +72,52 @@ Restart Claude Code (or start a new session) after installing. You should see a 
 
 | Command | What it does |
 |---|---|
-| `/fable-lite:plan <task>` | Fable decomposes the task, tags each item `[SONNET]`, `[OPUS]`, or `[FABLE]`, records design decisions, and writes `.fable-lite/plan.md`. Does not build. |
-| `/fable-lite:build [items]` | Executes the plan wave by wave. Briefs and dispatches each item to its tier, audits every result on Fable, updates status in the plan file, runs the verifier at the end. |
-| `/fable-lite:delegate <task> [--sonnet\|--opus\|--fable]` | One-off. Scores the task, briefs it, dispatches, audits, reports. Force a tier with a flag. |
-| `/fable-lite:audit [diff-target]` | Fable-tier review of the working tree (or a git diff target) against the audit checklist, with the verifier. Reports only; changes nothing. |
-| `/fable-lite:external <model> <task>` | Runs one item on a non-Anthropic model through a nested harness pointed at Ollama (or any Anthropic-compatible endpoint). `list` shows models and routes. |
-| `/fable-lite:help` | Prints the routing rule, commands, and agents. |
+| `/fable-lite:plan <task>` | The premium session decomposes the task into 2 to 4 non-overlapping phases, records design decisions, and writes `.fable-lite/plan.md`. Does not build. |
+| `/fable-lite:build` | Executes the plan: each phase goes to one long-running agent (Opus or external), non-overlapping phases in parallel, then presents the combined diff for you to audit and runs the verifier once. With `external.audit: "lite"`, a cheap auditor pre-checks first. |
+| `/fable-lite:delegate <task> [--sonnet\|--opus\|--model <ext>]` | One-off for a single long-running task: briefs it, dispatches to one agent, presents the diff. Quick changes it will tell you to just do inline. |
+| `/fable-lite:external <model> <task>` | Runs one task on a non-Anthropic model through a nested harness pointed at Ollama (or any Anthropic-compatible endpoint). `list` shows models and routes. |
+| `/fable-lite:stats` | Runs, turns, and tokens offloaded per external model, so the savings are measurable. |
+| `/fable-lite:audit [diff-target]` | Optional lite review of the working tree against the audit checklist. You remain the primary auditor. |
+| `/fable-lite:help` | Prints the model, commands, and agents. |
 
 ### Typical session
 
 ```
 > /fable-lite:plan add rate limiting to the public API, 100 req/min per key
 
-  Fable dispatches two scouts (where middleware lives, what the test setup is),
-  decides token bucket over sliding window, writes a 4-item plan:
-    1. [SONNET] add RATE_LIMIT_* settings with defaults
-    2. [OPUS]   token-bucket middleware + unit tests        (depends on 1)
-    3. [SONNET] register middleware on the public router     (depends on 2)
-    4. [FABLE]  audit the 429 path and header contract, full suite
+  The premium session dispatches one scout (where middleware lives, what the
+  test setup is), decides token bucket over sliding window, and writes a
+  2-phase plan:
+    Phase 1: settings + token-bucket middleware + its unit tests
+    Phase 2: register the middleware on the public router and wire config
+             (depends on phase 1)
 
 > /fable-lite:build
 
-  Wave 1: item 1 → Sonnet. Audited, accepted.
-  Wave 2: item 2 → Opus. Audited, sent back once (missing test for burst reset), accepted.
-  Wave 3: item 3 → Sonnet. Audited, accepted.
-  Wave 4: item 4 on Fable. Verifier: GREEN, 212 passed.
-  Routing: Sonnet 2 · Opus 1 · Fable 1 · escalations 0
+  Phase 1 → one agent (external glm-5.3-flash:cloud), runs to completion.
+  Phase 2 → one agent, after phase 1.
+  Verifier: GREEN, 212 passed.
+  Here is the combined diff for your review:  <shows git diff>
+  Offloaded: 2 phases on glm-5.3-flash:cloud (see /fable-lite:stats).
 ```
 
 ## Agents
 
-All four are available to the Agent tool as `fable-lite:<name>` and are used automatically by the commands. You can also call them directly in conversation ("use the fable-lite scout to find every caller of `parseConfig`").
+All are available to the Agent tool as `fable-lite:<name>`, and each also runs on an external model when its role is routed. You can call them directly in conversation ("use the fable-lite scout to find every caller of `parseConfig`").
 
 | Agent | Model | Tools | Use for |
 |---|---|---|---|
-| `scout` | Sonnet | read-only | "Where is…", "list all…", "how does X work", "find the best exemplar for…" |
-| `sonnet-implementer` | Sonnet | full | Single-file edits, pattern copies with a named exemplar, renames, config, docs |
-| `opus-implementer` | Opus | full | Multi-file features with a defined interface, refactors under test, known-cause bug fixes, test authoring |
-| `verifier` | Sonnet | read-only | Run tests / typecheck / lint / build, report faithfully with verbatim failure tails |
+| `scout` | Sonnet / external | read-only | "Where is…", "list all…", "how does X work", "find the best exemplar for…" |
+| `opus-implementer` | Opus / external | full | Execute one phase to completion from a clear brief: a feature and its tests, a refactor under test, a known-cause fix |
+| `sonnet-implementer` | Sonnet / external | full | A single-file or mechanical phase where an exemplar can be named |
+| `verifier` | Sonnet / external | read-only | Run tests / typecheck / lint / build, report faithfully with verbatim failure tails |
+| `auditor` | Sonnet / external | Read + Edit | Opt-in lite audit: check the diff against the brief, fix clear defects, flag risky code for you |
 
-Implementers work from a brief, stay inside its scope, never redesign (Sonnet reports BLOCKED the moment it would have to choose an approach; Opus may make small choices inside the fixed interface and must list them), never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations, observations) so Fable can audit from the diff plus a short summary rather than a transcript. If a brief conflicts with the code, they stop and report instead of improvising.
+Executors work from a brief, stay inside its scope, never redesign (Sonnet reports BLOCKED the moment it would have to choose an approach; Opus may make small choices inside the fixed interface and must list them), never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations). If a brief conflicts with the code, they stop and report instead of improvising. You audit the resulting diff; the `auditor` is an optional cheap pre-check, not a replacement for your review.
 
-## The routing rubric
+## Sizing and routing a phase
 
-Each work item is scored 0 to 2 on five axes and summed:
+**First: is it long enough to offload?** A quick change is cheaper done inline on the premium session than briefed and reviewed (measured — see the top of this README). Only substantial, multi-step, long-running work becomes a phase. Once it is a phase, these axes size it and pick the executor engine:
 
 | Axis | 0 | 1 | 2 |
 |---|---|---|---|
@@ -123,19 +127,19 @@ Each work item is scored 0 to 2 on five axes and summed:
 | Blast radius | local, private | shared code or public function | auth, data, money, deletion, concurrency, migrations, public API |
 | Spec clarity | fully specified | one or two routine calls | ambiguous |
 
-| Total | Route |
+| Total | Executor |
 |---|---|
-| 0 to 3 | `sonnet-implementer` |
-| 4 to 6 | `opus-implementer` |
-| 7 to 10 | Fable, or split the item until the pieces score lower |
+| 0 to 3 | `sonnet-implementer` tier (or its external route) |
+| 4 to 6 | `opus-implementer` tier (or its external route) |
+| 7 to 10 | too big or too vague for one phase — the premium session designs it first, then splits it into phases that score lower |
 
-Hard overrides: blast radius 2 means Fable designs the change and audits line by line regardless. Spec clarity 2 means it is not delegable until the ambiguity is resolved. Judgment 2 means Fable makes the decision first, writes it into the brief, then rescores (which usually lands on Opus).
+Hard overrides: blast radius 2 means the premium session designs the change and you audit it closely regardless of engine. Spec clarity 2 means it is not a runnable phase until the ambiguity is resolved. Judgment 2 means the premium session makes the decision first, writes it into the brief, then rescores (usually landing on the Opus tier).
 
 The full rubric with worked examples is in `skills/fable-lite/references/routing-rubric.md`.
 
 ## External models: Ollama and other Anthropic-compatible endpoints
 
-fable-lite can run the Sonnet or Opus tier on a model that is not from Anthropic. Claude Code has no per-agent provider switch: the Agent tool always talks to the session's own endpoint, so a subagent cannot be pointed at Ollama while the orchestrator stays on Claude. fable-lite gets around that by spawning a **nested Claude Code harness** for the item, with its endpoint set to Ollama for that process only. The nested run gets the same brief, the same implementer rules appended to its system prompt, the same tools, and reports in the same format, so Fable audits it exactly like any other result. No MCP server, no proxy, and the orchestrator's own Claude session and cache are untouched.
+fable-lite can run a phase on a model that is not from Anthropic. Claude Code has no per-agent provider switch: the Agent tool always talks to the session's own endpoint, so a subagent cannot be pointed at Ollama while the premium session stays on Claude. fable-lite gets around that by spawning a **nested Claude Code harness** for the phase, with its endpoint set to Ollama for that process only. The nested run gets the brief, the executor rules appended to its system prompt, the same tools, and reports in the same format, so its diff is one you review exactly like any other. No MCP server, no proxy, and the premium session's own Claude session and cache are untouched.
 
 **Auth.** The default endpoint is the local Ollama daemon (`http://localhost:11434`), which handles cloud models through your `ollama signin` account. No API key is needed, and cloud models take the `:cloud` suffix (`glm-5.3-flash:cloud`). To hit `https://ollama.com` directly instead, set `external.baseUrl` to it and export `OLLAMA_API_KEY`. Any other endpoint that speaks the Anthropic Messages API works the same way with `external.baseUrl` and `external.authToken`.
 
@@ -214,7 +218,7 @@ with the Bash tool, then audits the report on stdout exactly like an Agent resul
 fable-lite-batch wave.json
 ```
 
-It runs the items in parallel (concurrency 4), prints one combined report with a header per item, and exits non-zero if any item failed. The orchestrator dispatches and audits the whole wave from a single tool result, which is the main lever on orchestrator turns. Each item's full JSON still lands in `.fable-lite/runs/`.
+It runs the phases in parallel (concurrency 4), prints one combined report with a header per phase, and exits non-zero if any failed. The premium session dispatches all non-overlapping phases from a single tool call and hands you one diff, which is the main lever on premium-session turns. Each phase's full JSON still lands in `.fable-lite/runs/`.
 
 **See the offload.** `fable-lite-stats` (or `/fable-lite:stats`) reads `.fable-lite/runs/` and prints runs, turns, and tokens per external model, so the split is measurable. `--since YYYY-MM-DD` limits the window.
 
@@ -247,7 +251,7 @@ Auditing is yours: you read the diff and own acceptance. The opt-in lite auditor
 
 ## The skill, without the commands
 
-The `fable-lite` skill also loads automatically when you ask for implementation work in a normal conversation. It applies the same routing rule inline: scout for context, brief and dispatch the implementable parts, audit, verify, report. The commands are the structured version of the same loop, useful when the work is big enough to want a plan file.
+The `fable-lite` skill also loads automatically when you ask for implementation work in a normal conversation. It applies the same model inline: scout for context, do quick changes directly, offload long-running phases to one agent each, and hand you the diff to audit. The commands are the structured version of the same loop, useful when the work is big enough to want a plan file.
 
 ## Files this plugin creates in your project
 
