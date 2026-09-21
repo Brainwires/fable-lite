@@ -1,0 +1,12 @@
+{
+  "baseUrl": "http://localhost:11434",
+  "authToken": "ollama",
+  "routes": {
+    "opus": "kimi-k2.7-code:cloud",
+    "sonnet": "glm-5.3-flash:cloud",
+    "scout": "glm-5.3-flash:cloud",
+    "verifier": "glm-5.3-flash:cloud"
+  },
+  "allowedTools": "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(npm *),Bash(pnpm *),Bash(cargo *),Bash(go *),Bash(deno *),Bash(python3 *),Bash(pytest *),Bash(make *),Bash(bash *),Bash(git diff *),Bash(git status *),Bash(ls *),Bash(cat *),Bash(grep *)",
+  "strictAgentAllow": []
+}

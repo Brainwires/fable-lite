@@ -1,0 +1,13 @@
+{
+  "description": "jev orchestration: SessionStart banner + PreToolUse guards. All gated on JEV_ORCHESTRATION (off = no-ops); the agent-guard also reads JEV_EXTERNAL_MODELS. Set JEV_ORCH_QUIET=1 to silence the banner.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"", "timeout": 5 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Agent", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-guard.sh\"", "timeout": 5 } ] },
+      { "matcher": "Edit|Write|MultiEdit|NotebookEdit", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/edit-guard.sh\"", "timeout": 5 } ] },
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bash-guard.sh\"", "timeout": 5 } ] }
+    ]
+  }
+}
