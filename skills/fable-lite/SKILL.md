@@ -62,7 +62,11 @@ A phase brief still carries goal, exact files, an exemplar when one exists, type
 
 ## Strict mode
 
-`external.strict: true` makes the split enforced rather than advisory: hooks block the Agent tool, block editing project code, and block test/build runs on the premium session, so every phase and every check goes to an external model. Small inline changes are blocked too, so strict mode trades some premium tokens (and latency) on small work for a hard guarantee that the session never implements. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts the edit and Bash guards until removed. Use strict when your priority is a hard cap guarantee; leave it off to keep small changes inline (usually cheaper).
+`external.strict: true` makes the split enforced rather than advisory: hooks block editing project code, test/build runs, and implementation agents on the premium session, so every phase and check goes to an external model. Small inline changes are blocked too, so strict trades some premium tokens (and latency) on small work for a hard guarantee that the session never implements.
+
+Strict does **not** block read-only research/knowledge agents (`claude-code-guide`, `Explore`, `Plan`, plus any name in `external.strictAgentAllow`). Those read and research — often needing web or Anthropic-only tools an external model does not have — and blocking them would only force the premium session to do the reading itself. Codebase `scout`/`verifier` still go external when routed (the external model can search a codebase); a research agent that needs web access cannot, so it runs on Anthropic.
+
+The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts **every** strict guard — edits, Bash, and the Agent tool — until removed. Use it (or `strictAgentAllow`) when an agent genuinely needs to run on the premium session. Leave strict off to keep small changes inline (usually cheaper).
 
 ## What this is and is not
 
