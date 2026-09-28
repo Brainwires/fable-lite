@@ -1,47 +1,48 @@
 # fable-lite
 
-**Spend Fable where it matters.**
+**Orchestrate on Opus, spend Fable only where it counts.**
 
-A Claude Code plugin that keeps deep reasoning (understanding, planning, design decisions) on your premium session — Fable or Opus — and offloads long-running implementation to one agent per phase, on Opus or on an external model (Ollama local or cloud) that is entirely off your Anthropic usage cap.
+A Claude Code plugin that keeps deep reasoning (understanding, planning, design decisions, audit) on an **Opus** session — a strong reasoner that costs less than Fable — and offloads implementation to one agent per phase, routed by difficulty: down to Sonnet or Opus for routine phases, up to **Fable** for the hardest ones, or out to an external model (Ollama local or cloud) that is entirely off your Anthropic usage cap.
 
-The premium model's value is thinking, not typing. Once the approach is decided, executing it does not need the best model. fable-lite plans on the premium session, hands each phase of the plan to one long-running agent, and gives you back a clean diff to audit.
+Opus's value here is thinking and coordinating, not typing. Routine implementation does not need the top model; the hardest phases do. So fable-lite plans on Opus, hands each phase to one long-running agent on the right tier, and gives you back a clean diff to audit. Fable stops being the thing that runs the whole session and becomes the top **executor** tier — a capped, premium resource you point at exactly the phases that justify it, rather than letting the allotment sit unused.
 
 ### Where the savings come from, honestly
 
-Offloading pays off for **long-running work**, not small tasks. Delegation has a fixed premium cost the implementation does not: writing the brief, and reviewing the result. Measured on this project (same model both sides, comparing token counts):
+Offloading pays off for **long-running work**, not small tasks. Delegation has a fixed orchestrator cost the implementation does not: writing the brief, and reviewing the result. Measured on this project (same model both sides, comparing token counts):
 
 - A **one-liner**: delegate ≈ inline. A wash.
-- A **class plus tests**: inline cost ~1,400 premium output tokens; delegating and auditing it thoroughly cost ~3,900. Delegation lost, because auditing code you did not write costs about as much as writing it.
+- A **class plus tests**: inline cost ~1,400 orchestrator output tokens; delegating and auditing it thoroughly cost ~3,900. Delegation lost, because auditing code you did not write costs about as much as writing it.
 
-So this is not "offload everything." Small or quick changes stay inline on the premium session; long-running phases get offloaded, where the implementation cost dwarfs the brief and the win is real. And **you are the primary auditor** — the plugin hands you one diff rather than burning premium tokens re-deriving what the agent did. An opt-in lite audit (a cheap checks-and-fixes pass) is available if you want a first pass; it does not replace your review.
+So this is not "offload everything." Small or quick changes stay inline on the Opus orchestrator; long-running phases get offloaded to their tier, where the implementation cost dwarfs the brief and the win is real — and the hardest phases go to Fable, where the top model runs the phase instead of the orchestrator. **You are the primary auditor** — the plugin hands you one diff rather than burning cap tokens re-deriving what the agent did. An opt-in lite audit (a cheap checks-and-fixes pass) is available if you want a first pass; it does not replace your review.
 
 ## How it works
 
 ```
                    ┌───────────────────────────────────────────┐
-  you ───────────► │  premium session (Fable / Opus)           │
+  you ───────────► │  Opus orchestrator                         │
                    │  understand · plan into phases · hand off  │
-                   │  present one diff · report                 │
+                   │  present one diff · audit · report         │
                    └──┬──────────┬───────────┬──────────┬───────┘
                       │          │           │          │
                  read-only   phase 1     phase 2     run tests
                  research   (long-run)  (long-run)   at the end
                       │          │           │          │
                       ▼          ▼           ▼          ▼
-                   scout /    one agent   one agent   verifier
-                   research   per phase   per phase
-                   (allowed)  (Opus / external)      (Sonnet / external)
+                   scout /   one agent    one agent    verifier
+                   research  per phase,   per phase,
+                   (allowed) routed by difficulty:     (Sonnet / external)
+                             Sonnet · Opus · Fable (hardest) · external
 
   you audit the diff   ·   opt-in lite auditor can pre-check
 ```
 
-1. **The premium session understands the request** and asks scouts for context instead of reading the whole codebase itself.
-2. **It plans on the premium session** and decomposes the work into 2 to 4 non-overlapping phases. Quick changes are done inline, not delegated.
-3. **Each phase goes to one long-running agent**, on Opus or an external model. Non-overlapping phases run concurrently (at most ~4 at once, matching the phase count).
-4. **You audit the diff.** The plugin presents one clean diff; you own acceptance. Optionally, an opt-in lite auditor does a cheap checks-and-fixes pass first.
+1. **The Opus orchestrator understands the request** and asks scouts for context instead of reading the whole codebase itself.
+2. **It plans on Opus** and decomposes the work into 2 to 4 non-overlapping phases, tagging each with its tier. Quick changes are done inline, not delegated.
+3. **Each phase goes to one long-running agent on its tier** — Sonnet or Opus for routine phases, Fable for the hardest, or an external model. Non-overlapping phases run concurrently (at most ~4 at once, matching the phase count).
+4. **You audit the diff.** The plugin presents one clean diff; you own acceptance. For a risky Fable-executed phase, the orchestrator audits it line by line first. Optionally, an opt-in lite auditor does a cheap checks-and-fixes pass.
 5. **A verifier runs the suite** once at the end, and the session reports what changed and what ran where.
 
-The rule in one line: **the premium model plans and you audit; the long-running typing in between happens somewhere cheaper.**
+The rule in one line: **Opus plans and audits; the typing in between goes to the cheapest tier that can do it well, and only the hardest phases go to Fable.**
 
 ## Install
 
@@ -72,9 +73,9 @@ Restart Claude Code (or start a new session) after installing. You should see a 
 
 | Command | What it does |
 |---|---|
-| `/fable-lite:plan <task>` | The premium session decomposes the task into 2 to 4 non-overlapping phases, records design decisions, and writes `.fable-lite/plan.md`. Does not build. |
-| `/fable-lite:build` | Executes the plan: each phase goes to one long-running agent (Opus or external), non-overlapping phases in parallel, then presents the combined diff for you to audit and runs the verifier once. With `external.audit: "lite"`, a cheap auditor pre-checks first. |
-| `/fable-lite:delegate <task> [--sonnet\|--opus\|--model <ext>]` | One-off for a single long-running task: briefs it, dispatches to one agent, presents the diff. Quick changes it will tell you to just do inline. |
+| `/fable-lite:plan <task>` | The Opus orchestrator decomposes the task into 2 to 4 non-overlapping phases, tags each with its tier (Sonnet/Opus/Fable), records design decisions, and writes `.fable-lite/plan.md`. Does not build. |
+| `/fable-lite:build` | Executes the plan: each phase goes to one long-running agent on its tier (Sonnet, Opus, Fable, or external), non-overlapping phases in parallel, then presents the combined diff for you to audit and runs the verifier once. With `external.audit: "lite"`, a cheap auditor pre-checks first. |
+| `/fable-lite:delegate <task> [--sonnet\|--opus\|--fable\|--model <ext>]` | One-off for a single long-running task: scores it, briefs it, dispatches to one agent on the right tier, presents the diff. Quick changes it will tell you to just do inline. |
 | `/fable-lite:external <model> <task>` | Runs one task on a non-Anthropic model through a nested harness pointed at Ollama (or any Anthropic-compatible endpoint). `list` shows models and routes. |
 | `/fable-lite:stats` | Runs, turns, and tokens offloaded per external model, so the savings are measurable. |
 | `/fable-lite:audit [diff-target]` | Optional lite review of the working tree against the audit checklist. You remain the primary auditor. |
@@ -85,7 +86,7 @@ Restart Claude Code (or start a new session) after installing. You should see a 
 ```
 > /fable-lite:plan add rate limiting to the public API, 100 req/min per key
 
-  The premium session dispatches one scout (where middleware lives, what the
+  The Opus orchestrator dispatches one scout (where middleware lives, what the
   test setup is), decides token bucket over sliding window, and writes a
   2-phase plan:
     Phase 1: settings + token-bucket middleware + its unit tests
@@ -108,16 +109,17 @@ All are available to the Agent tool as `fable-lite:<name>`, and each also runs o
 | Agent | Model | Tools | Use for |
 |---|---|---|---|
 | `scout` | Sonnet / external | read-only | "Where is…", "list all…", "how does X work", "find the best exemplar for…" |
-| `opus-implementer` | Opus / external | full | Execute one phase to completion from a clear brief: a feature and its tests, a refactor under test, a known-cause fix |
 | `sonnet-implementer` | Sonnet / external | full | A single-file or mechanical phase where an exemplar can be named |
+| `opus-implementer` | Opus / external | full | Execute one phase to completion from a clear brief: a feature and its tests, a refactor under test, a known-cause fix |
+| `fable-implementer` | Fable | full | The hardest phases only: large or subtle execution from a decided approach, or a risky change (auth, data, money, migrations, public APIs) the orchestrator designed and briefed. Reserved for work that justifies the premium tier |
 | `verifier` | Sonnet / external | read-only | Run tests / typecheck / lint / build, report faithfully with verbatim failure tails |
 | `auditor` | Sonnet / external | Read + Edit | Opt-in lite audit: check the diff against the brief, fix clear defects, flag risky code for you |
 
-Executors work from a brief, stay inside its scope, never redesign (Sonnet reports BLOCKED the moment it would have to choose an approach; Opus may make small choices inside the fixed interface and must list them), never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations). If a brief conflicts with the code, they stop and report instead of improvising. You audit the resulting diff; the `auditor` is an optional cheap pre-check, not a replacement for your review.
+Executors work from a brief, stay inside its scope, never redesign (Sonnet reports BLOCKED the moment it would have to choose an approach; Opus and Fable may make small choices inside the fixed interface and must list them), never commit, and end with a fixed report (`DONE | PARTIAL | BLOCKED`, files changed, verification, deviations). `fable-implementer` also reports a **tier check** — whether the phase actually needed the top model — so the Fable allotment stays pointed at work that justifies it. If a brief conflicts with the code, they stop and report instead of improvising. You audit the resulting diff; the `auditor` is an optional cheap pre-check, not a replacement for your review.
 
 ## Sizing and routing a phase
 
-**First: is it long enough to offload?** A quick change is cheaper done inline on the premium session than briefed and reviewed (measured — see the top of this README). Only substantial, multi-step, long-running work becomes a phase. Once it is a phase, these axes size it and pick the executor engine:
+**First: is it long enough to offload?** A quick change is cheaper done inline on the Opus orchestrator than briefed and reviewed (measured — see the top of this README). Only substantial, multi-step, long-running work becomes a phase. Once it is a phase, these axes size it and pick the executor engine:
 
 | Axis | 0 | 1 | 2 |
 |---|---|---|---|
@@ -131,15 +133,16 @@ Executors work from a brief, stay inside its scope, never redesign (Sonnet repor
 |---|---|
 | 0 to 3 | `sonnet-implementer` tier (or its external route) |
 | 4 to 6 | `opus-implementer` tier (or its external route) |
-| 7 to 10 | too big or too vague for one phase — the premium session designs it first, then splits it into phases that score lower |
+| 7 to 9 | `fable-implementer` tier — the hardest execution from a decided approach. If it is really several items, the orchestrator splits it into phases that score lower; if it is one genuinely hard phase, it goes to Fable rather than being ground out on Opus |
+| 10 | almost always a risky change: the orchestrator designs it and writes an explicit brief, `fable-implementer` executes, the orchestrator audits line by line |
 
-Hard overrides: blast radius 2 means the premium session designs the change and you audit it closely regardless of engine. Spec clarity 2 means it is not a runnable phase until the ambiguity is resolved. Judgment 2 means the premium session makes the decision first, writes it into the brief, then rescores (usually landing on the Opus tier).
+Hard overrides: blast radius 2 means the Opus orchestrator designs the change and writes the explicit brief; Fable executes it and you audit it line by line. Spec clarity 2 means it is not a runnable phase until the ambiguity is resolved. Judgment 2 means the orchestrator makes the decision first, writes it into the brief, then rescores (usually landing on Sonnet or Opus, or Fable if executing the decided approach is itself hard). Reserve Fable for phases that need it — but route those phases to it, so the capped allotment is spent on work that justifies it rather than left idle.
 
 The full rubric with worked examples is in `skills/fable-lite/references/routing-rubric.md`.
 
 ## External models: Ollama and other Anthropic-compatible endpoints
 
-fable-lite can run a phase on a model that is not from Anthropic. Claude Code has no per-agent provider switch: the Agent tool always talks to the session's own endpoint, so a subagent cannot be pointed at Ollama while the premium session stays on Claude. fable-lite gets around that by spawning a **nested Claude Code harness** for the phase, with its endpoint set to Ollama for that process only. The nested run gets the brief, the executor rules appended to its system prompt, the same tools, and reports in the same format, so its diff is one you review exactly like any other. No MCP server, no proxy, and the premium session's own Claude session and cache are untouched.
+fable-lite can run a phase on a model that is not from Anthropic. Claude Code has no per-agent provider switch: the Agent tool always talks to the session's own endpoint, so a subagent cannot be pointed at Ollama while the orchestrator stays on Claude. fable-lite gets around that by spawning a **nested Claude Code harness** for the phase, with its endpoint set to Ollama for that process only. The nested run gets the brief, the executor rules appended to its system prompt, the same tools, and reports in the same format, so its diff is one you review exactly like any other. No MCP server, no proxy, and the orchestrator's own Claude session and cache are untouched.
 
 **Auth.** The default endpoint is the local Ollama daemon (`http://localhost:11434`), which handles cloud models through your `ollama signin` account. No API key is needed, and cloud models take the `:cloud` suffix (`glm-5.3-flash:cloud`). To hit `https://ollama.com` directly instead, set `external.baseUrl` to it and export `OLLAMA_API_KEY`. Any other endpoint that speaks the Anthropic Messages API works the same way with `external.baseUrl` and `external.authToken`.
 
@@ -159,7 +162,7 @@ fable-lite can run a phase on a model that is not from Anthropic. Claude Code ha
 
 Routes exist for all four roles: `sonnet`, `opus`, `scout`, and `verifier`. With routes set, `/fable-lite:build`, `/fable-lite:delegate`, and the auto-loaded skill send those roles to the named models, and a PreToolUse hook denies any Agent-tool call for a routed role with a message pointing at `fable-lite-run`. Without routes, nothing changes.
 
-**Strict mode.** Set `"strict": true` under `external` and three PreToolUse hooks enforce the split: the Agent tool is denied, Edit/Write to **project code** are denied, and test/build/lint/install runs plus code-writing Bash (heredocs, `sed -i`, `tee`, `cp`, `mv`, `patch`, `git apply`) are denied. "Project code" means files inside the project tree except under `.fable-lite/`; writes outside the project tree (the plans dir, the scratchpad, `~/.claude`, `/tmp`) are orchestration and stay allowed, so plan mode and note-taking still work. The Bash write-guard is fail-closed: a write-shaped command whose target can't be resolved is denied. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. Strict does not block read-only research agents (`claude-code-guide`, `Explore`, `Plan`, or any name in `external.strictAgentAllow`) — those need web or Anthropic-only tools an external model lacks, and blocking them would just push the reading onto the premium session. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts every strict guard — edits, Bash, and the Agent tool — until it is removed. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
+**Strict mode.** Set `"strict": true` under `external` and three PreToolUse hooks enforce the split: the Agent tool is denied, Edit/Write to **project code** are denied, and test/build/lint/install runs plus code-writing Bash (heredocs, `sed -i`, `tee`, `cp`, `mv`, `patch`, `git apply`) are denied. "Project code" means files inside the project tree except under `.fable-lite/`; writes outside the project tree (the plans dir, the scratchpad, `~/.claude`, `/tmp`) are orchestration and stay allowed, so plan mode and note-taking still work. The Bash write-guard is fail-closed: a write-shaped command whose target can't be resolved is denied. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. Strict does not block read-only research agents (`claude-code-guide`, `Explore`, `Plan`, or any name in `external.strictAgentAllow`) — those need web or Anthropic-only tools an external model lacks, and blocking them would just push the reading onto the orchestrator. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts every strict guard — edits, Bash, and the Agent tool — until it is removed. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
 
 ```json
 {
@@ -218,7 +221,7 @@ with the Bash tool, then audits the report on stdout exactly like an Agent resul
 fable-lite-batch wave.json
 ```
 
-It runs the phases in parallel (concurrency 4), prints one combined report with a header per phase, and exits non-zero if any failed. The premium session dispatches all non-overlapping phases from a single tool call and hands you one diff, which is the main lever on premium-session turns. Each phase's full JSON still lands in `.fable-lite/runs/`.
+It runs the phases in parallel (concurrency 4), prints one combined report with a header per phase, and exits non-zero if any failed. The orchestrator dispatches all non-overlapping phases from a single tool call and hands you one diff, which is the main lever on orchestrator turns. Each phase's full JSON still lands in `.fable-lite/runs/`.
 
 **See the offload.** `fable-lite-stats` (or `/fable-lite:stats`) reads `.fable-lite/runs/` and prints runs, turns, and tokens per external model, so the split is measurable. `--since YYYY-MM-DD` limits the window.
 
@@ -238,16 +241,17 @@ Subagents are cheaper per token than Fable, but each spawn pays a fixed orientat
 - A single grep or file read is done in-session, never briefed
 - Parallelism is used for genuinely independent items, never manufactured by splitting one agent's work into several
 
-## What stays on the premium session
+## What stays on the Opus orchestrator
 
 - Understanding the request and resolving ambiguity with you
 - Planning: decomposition into phases, sequencing, architecture, naming public things
-- Design decisions for anything touching auth, secrets, payments, migrations, deletion, concurrency, or public API contracts
+- Design decisions for anything touching auth, secrets, payments, migrations, deletion, concurrency, or public API contracts — the decision stays here even when Fable executes the change
 - Debugging when the root cause is unknown
 - Quick or small changes (delegating them saves nothing)
+- Auditing, including the line-by-line audit of a Fable-executed risky phase
 - Handing you a clean diff and the summary you read
 
-Auditing is yours: you read the diff and own acceptance. The opt-in lite auditor is a convenience that fixes clear defects and flags risky code for you; it is not a claim that the AI audits everything. If you want the hard guarantee that the session never implements, turn on strict mode and accept the premium cost it adds on small work.
+Auditing is yours: you read the diff and own acceptance. The opt-in lite auditor is a convenience that fixes clear defects and flags risky code for you; it is not a claim that the AI audits everything. If you want the hard guarantee that the session never implements, turn on strict mode and accept the orchestrator cost it adds on small work.
 
 ## The skill, without the commands
 
@@ -268,7 +272,7 @@ Add `.fable-lite/` to your `.gitignore` if you do not want these committed (keep
 | `external.routes` | Map roles (`opus`, `sonnet`, `scout`, `verifier`, `auditor`) to external models. A routed role runs via `fable-lite-run` instead of an Agent call. |
 | `external.audit` | `"off"` (default): you audit the diff. `"lite"`: after a phase, a cheap `auditor` agent does a checks-and-fixes pass and reports what it fixed and flagged, before your review. |
 | `external.strict` | `true`: hooks enforce the split — the session never implements; every phase and check goes external. Adds premium cost on small work in exchange for the hard guarantee. |
-| `external.strictAgentAllow` | Extra agent names strict should allow to run on the premium session (read-only research/knowledge agents). `claude-code-guide`, `Explore`, `Plan` are always allowed. |
+| `external.strictAgentAllow` | Extra agent names strict should allow to run on the orchestrator session (read-only research/knowledge agents). `claude-code-guide`, `Explore`, `Plan` are always allowed. |
 | `FABLE_LITE_QUIET=1` | Suppress the session-start reminder. |
 | Agent `model` override | The Anthropic agents pin `opus`/`sonnet` in frontmatter; pass `model` on an Agent call to override, or edit `agents/*.md` locally. |
 
@@ -283,6 +287,7 @@ fable-lite/
 │   ├── scout.md              # Sonnet, read-only
 │   ├── sonnet-implementer.md # Sonnet
 │   ├── opus-implementer.md   # Opus, one phase to completion
+│   ├── fable-implementer.md  # Fable, the hardest phases only
 │   ├── verifier.md           # Sonnet, read-only
 │   └── auditor.md            # opt-in lite audit: checks and fixes
 ├── skills/
@@ -322,15 +327,15 @@ fable-lite/
 └── LICENSE
 ```
 
-## Why not just use a cheaper model for the whole session?
+## Why orchestrate on Opus and not just run everything on one model?
 
-Because the expensive parts of a task are exactly the parts where model quality shows: noticing the ambiguity before it becomes a wrong implementation, choosing the design that will not need to be redone, and catching the subtle bug in review. Running those on a cheaper model saves tokens and costs rework. Running the mechanical parts on Fable costs tokens and saves nothing. fable-lite is the split that keeps both sides honest.
+Because the parts of a task where model quality actually shows — noticing the ambiguity before it becomes a wrong implementation, choosing the design that will not need to be redone, catching the subtle bug in review — are the orchestrator's parts, and Opus is a strong reasoner at a lower cost than Fable, so that is where the best cost-vs-performance sits. Running mechanical implementation on Opus (or Fable) costs tokens and saves nothing; running it on Sonnet or an external model does. And the reverse waste is just as real: forcing a genuinely hard phase onto Opus to avoid touching Fable risks rework and leaves a capped Fable allotment sitting idle. fable-lite is the split that keeps every tier honest — Sonnet for routine, Opus orchestrating and handling medium work, Fable for the hardest phases, and you auditing the diff.
 
 ## Requirements
 
 - Claude Code 2.1 or later (plugin skills, namespaced agents, `${CLAUDE_PLUGIN_ROOT}`)
 - For external models: Ollama 0.13 or later (Anthropic-compatible API) with `ollama signin` for cloud models, `python3` on PATH for the runner's JSON handling
-- A session model worth protecting. The plugin works on any session model, but the savings come from running the orchestrator on Fable.
+- An Opus orchestrator session. The plugin works on any session model, but the intended split is Opus orchestrating — planning and auditing — while Sonnet/Opus/Fable executors do the implementation by difficulty.
 
 ## Contributing
 

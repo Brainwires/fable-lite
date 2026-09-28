@@ -13,10 +13,10 @@ Print the following to the user, adapted lightly to the current context if a pla
 **Routing rule:** Fable plans, decides, and audits. Opus implements multi-file or judgment-bearing changes from a clear spec. Sonnet does small, mechanical, pattern-following edits. Read-only searching goes to a Sonnet scout. Test runs go to a Sonnet verifier.
 
 **Commands**
-- `/fable-lite:plan <task>` — the premium session decomposes the task into 2-4 non-overlapping phases. Writes `.fable-lite/plan.md`.
-- `/fable-lite:build` — runs each phase with one long-running agent (non-overlapping phases in parallel), then hands you one diff to audit and runs the verifier once.
-- `/fable-lite:delegate <task> [--sonnet|--opus|--fable]` — one-off: score, brief, dispatch, audit, report.
-- `/fable-lite:audit [diff-target]` — Fable-tier review of the current changes with the verifier.
+- `/fable-lite:plan <task>` — the Opus orchestrator decomposes the task into 2-4 non-overlapping phases, tagging each with its tier (Sonnet, Opus, or Fable). Writes `.fable-lite/plan.md`.
+- `/fable-lite:build` — runs each phase with one long-running agent on its tier (non-overlapping phases in parallel), then hands you one diff to audit and runs the verifier once.
+- `/fable-lite:delegate <task> [--sonnet|--opus|--fable]` — one-off: score, brief, dispatch (Sonnet/Opus/Fable by difficulty), audit, report.
+- `/fable-lite:audit [diff-target]` — deep orchestrator (Opus) review of the current changes with the verifier.
 - `/fable-lite:external <model> <task>` — run one item on a non-Anthropic model (Ollama local/cloud or any Anthropic-compatible endpoint). `/fable-lite:external list` shows models and routes.
 - `/fable-lite:stats` — show runs, turns, and tokens offloaded to each external model.
 - `/fable-lite:help` — this.
@@ -25,6 +25,7 @@ Print the following to the user, adapted lightly to the current context if a pla
 - `scout` (Sonnet, read-only) — find, list, summarize, pick an exemplar
 - `sonnet-implementer` (Sonnet) — single-file, mechanical, pattern-copy edits
 - `opus-implementer` (Opus) — multi-file features, refactors, known-cause fixes, tests
+- `fable-implementer` (Fable) — the hardest phases only: large/subtle execution, or a risky change the orchestrator designed and briefed
 - `verifier` (Sonnet, read-only) — run tests / typecheck / lint / build and report
 
 **External models:** put `external.routes` in `.fable-lite/config.json` (see `${CLAUDE_PLUGIN_ROOT}/examples/fable-lite.config.json`) to run the Sonnet or Opus tier on, for example, `glm-5.3-flash:cloud` or `kimi-k2.7-code:cloud` through your Ollama sign-in.

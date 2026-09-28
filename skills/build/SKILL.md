@@ -1,6 +1,6 @@
 ---
 name: build
-description: Execute the current fable-lite plan. Runs each phase with one long-running agent (Opus or an external model), non-overlapping phases in parallel, then presents one combined diff for the human to audit and runs the verifier once. Updates phase status in .fable-lite/plan.md.
+description: Execute the current fable-lite plan. Runs each phase with one long-running agent on its tier (Sonnet, Opus, Fable for the hardest, or an external model), non-overlapping phases in parallel, then presents one combined diff for the human to audit and runs the verifier once. Updates phase status in .fable-lite/plan.md.
 argument-hint: [phase numbers to run, e.g. "1 2" — default all pending]
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Bash(fable-lite-run *), Bash(fable-lite-batch *), Bash(fable-lite-models *), Bash(fable-lite-stats *), Edit, Write, Agent
@@ -30,12 +30,12 @@ Load `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/brief-template.md`. Wor
 
 3. **Run each phase with one long-running agent.** Pick the engine from the phase's tier and the routes:
    - tier routed externally, or tagged `[EXT:<model>]` → `fable-lite-run --model <model> --brief <file> --cwd <dir>` (background it if it will take more than a minute).
-   - tier not routed → the Agent tool with `subagent_type: "fable-lite:opus-implementer"` (or `sonnet-implementer` for a mechanical phase).
+   - tier not routed → the Agent tool with the subagent for the phase's tag: `[SONNET]` → `fable-lite:sonnet-implementer`, `[OPUS]` → `fable-lite:opus-implementer`, `[FABLE]` → `fable-lite:fable-implementer` (the hardest phases only). For a risky `[FABLE]` phase, the brief must already carry the orchestrator's decision and typed steps — Fable executes, it does not design.
    **Non-overlapping phases run concurrently:** write all their briefs, then dispatch them together with `fable-lite-batch <manifest.json>` (a JSON array of `{model, brief, role}`) — one combined report, at most ~4 at once. Phases that touch the same files run in sequence.
 
-4. **Present the diff — you do not audit it, the human does.** When the phases return, show a clean `git diff` (or `git diff --stat` plus the notable hunks) and say what each phase changed. Do not spend premium tokens re-deriving the implementation. If `external.audit` is `"lite"`, first dispatch the auditor (`fable-lite-run --role auditor --model <routed auditor> --brief .fable-lite/briefs/audit-<n>.md --cwd <dir>`) and fold its Fixed/Flags into what you show. Set each accepted phase `done`.
+4. **Present the diff — you do not audit it, the human does.** When the phases return, show a clean `git diff` (or `git diff --stat` plus the notable hunks) and say what each phase changed. Do not spend orchestrator tokens re-deriving routine implementation. The one exception: a **risky `[FABLE]` phase** (auth, data, money, deletion, migrations, public APIs) — audit that one line by line yourself before presenting it, since you designed it. If `external.audit` is `"lite"`, first dispatch the auditor (`fable-lite-run --role auditor --model <routed auditor> --brief .fable-lite/briefs/audit-<n>.md --cwd <dir>`) and fold its Fixed/Flags into what you show. Set each accepted phase `done`.
 
-5. **When a phase is clearly wrong against its brief** (you noticed, the lite auditor flagged it, or the agent reported BLOCKED): brief the fix back to the **same phase engine** as typed steps. A redesign (the agent chose an approach) is a brief-clarity failure — re-send typed steps, do not escalate. Two failures on the same phase: escalate to the Anthropic tier above (Opus, then take it over yourself under a `.fable-lite/takeover` marker). A real brief-vs-code conflict: adjust the plan, or ask the user if the decision is theirs; set status `blocked`.
+5. **When a phase is clearly wrong against its brief** (you noticed, the lite auditor flagged it, or the agent reported BLOCKED): brief the fix back to the **same phase engine** as typed steps. A redesign (the agent chose an approach) is a brief-clarity failure — re-send typed steps, do not escalate. Two failures on the same phase: escalate one tier up (Sonnet → Opus → Fable), then take it over yourself on the orchestrator under a `.fable-lite/takeover` marker if even Fable cannot land it from an explicit brief. A real brief-vs-code conflict: adjust the plan, or ask the user if the decision is theirs; set status `blocked`.
 
 6. **After the last phase**, dispatch the verifier once for the full relevant suite (external if routed). Do not verify per phase; executors run their own targeted checks. If red, brief the failures back to the owning phase's engine.
 

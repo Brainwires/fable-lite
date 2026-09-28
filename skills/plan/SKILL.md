@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Produce a fable-lite work plan for a task. The premium session does the understanding and decomposition into 2-4 non-overlapping phases, tags each phase with the engine tier that should execute it, and writes the plan to .fable-lite/plan.md for /fable-lite:build to run.
+description: Produce a fable-lite work plan for a task. The Opus orchestrator does the understanding and decomposition into 2-4 non-overlapping phases, tags each phase with the engine tier that should execute it (Sonnet, Opus, or Fable for the hardest), and writes the plan to .fable-lite/plan.md for /fable-lite:build to run.
 argument-hint: <task description>
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdir *), Write, Agent
@@ -10,7 +10,7 @@ allowed-tools: Read, Grep, Glob, Bash(git *), Bash(ls *), Bash(cat *), Bash(mkdi
 
 Task: $ARGUMENTS
 
-This is premium-session work: plan well, once. Read `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/routing-rubric.md` before sizing phases.
+This is orchestrator work: plan well, once, on Opus. Read `${CLAUDE_PLUGIN_ROOT}/skills/fable-lite/references/routing-rubric.md` before sizing phases.
 
 ## Steps
 
@@ -20,7 +20,7 @@ This is premium-session work: plan well, once. Read `${CLAUDE_PLUGIN_ROOT}/skill
 
 3. **Decompose into phases.** Break the work into **2 to 4 non-overlapping phases**, not a stream of tiny items. A phase is a coherent chunk one agent runs to completion (e.g. "data layer + its tests", "the endpoint + wiring"). Merge small related work into the phase it belongs to; do not delegate one-line changes at all (do those inline). Phases that touch the same files must be sequenced; phases that do not can run concurrently. Rarely more than 4 phases, which is also the most agents that should run at once.
 
-4. **Size and tag each phase.** Score each phase with the rubric to pick its tier and tag it `[SONNET]` or `[OPUS]` (or `[EXT:<model>]` to pin a specific external model). The tag names the tier; if `.fable-lite/config.json` routes that tier externally, build runs it there. Design decisions are made here, during planning, and written under Decisions — they are not a phase. A phase that must stay on the premium session (a genuinely risky change you will hand-write) is rare; tag it `[FABLE]` and say why.
+4. **Size and tag each phase.** Score each phase with the rubric to pick its tier and tag it `[SONNET]`, `[OPUS]`, or `[FABLE]` (or `[EXT:<model>]` to pin a specific external model). The tag names the tier; if `.fable-lite/config.json` routes that tier externally, build runs it there. `[FABLE]` is the top executor tier — for the hardest phases (large/subtle execution, or a risky change), dispatched to `fable-implementer`; reserve it for phases that justify the premium tier, but do tag genuinely hard phases `[FABLE]` rather than forcing them onto Opus. Design decisions are made here, during planning, and written under Decisions — they are not a phase. For a risky `[FABLE]` phase, the decision and the explicit brief are written here; Fable only executes.
 
 5. **Sequence.** Mark each phase's dependencies. Phases that do not touch the same files can run concurrently; phases that do must be ordered. Note the overlaps so build sequences them.
 
@@ -39,7 +39,7 @@ Created: <date>
 Request: <the user's request, verbatim or lightly condensed>
 
 ## Decisions
-- <design decision Fable made, and why, one line each>
+- <design decision the orchestrator made, and why, one line each>
 
 ## Context
 - Test command: `...`
@@ -66,7 +66,7 @@ Brief: ...
 - (Otherwise: list which phases must run in sequence and why.)
 
 ## Offload summary
-Opus tier: N phases · Sonnet tier: N phases · premium session: N phases
+Sonnet tier: N phases · Opus tier: N phases · Fable tier: N phases
 ```
 
 Status values are `todo`, `in-progress`, `done`, `blocked`, `skipped`.

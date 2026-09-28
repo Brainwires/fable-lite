@@ -6,7 +6,7 @@
 #   - Read-only research/knowledge agents (claude-code-guide, Explore, Plan, and
 #     any name in external.strictAgentAllow) -> allow even under strict. They do
 #     not implement, and they often need web / Anthropic-only tools an external
-#     model does not have, so blocking them just forces the premium session to do
+#     model does not have, so blocking them just forces the orchestrator session to do
 #     the reading itself. Not the cap problem strict exists to solve.
 #   - Implementation agents with an external route -> deny, point to fable-lite-run.
 #   - Under strict, other agents (unknown / general-purpose that may write code)
@@ -41,6 +41,7 @@ readonly_allow = {"claude-code-guide", "Explore", "Plan", "statusline-setup"}
 readonly_allow |= set(ext.get("strictAgentAllow") or [])
 
 role_of = {"sonnet-implementer": "sonnet", "opus-implementer": "opus",
+           "fable-implementer": "fable",
            "scout": "scout", "verifier": "verifier"}
 tier = role_of.get(name)
 model = routes.get(tier) if tier else None
@@ -65,8 +66,8 @@ if strict:
         if model:
             deny(f"[fable-lite strict] Route the '{tier}' role to the external model instead of the Agent tool: {cmd(tier, model)}")
         sys.exit(0)
-    # implementers: never on the premium session under strict.
-    if tier in ("sonnet", "opus"):
+    # implementers: never on the orchestrator session under strict.
+    if tier in ("sonnet", "opus", "fable"):
         if model:
             deny(f"[fable-lite strict] Implementation runs on the external model, not the Agent tool. Write the brief to .fable-lite/briefs/<slug>.md (typed Steps) and run: {cmd(tier, model)}")
         deny(f"[fable-lite strict] The '{tier}' tier has no external route in {cfg_path}. Add external.routes.{tier}, or lift strict for this task with: mkdir -p .fable-lite && echo reason > .fable-lite/takeover  (then rm it).")
