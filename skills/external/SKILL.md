@@ -12,6 +12,8 @@ Arguments: $ARGUMENTS
 
 Runs work on a model that is not an Anthropic model, using the same brief, the same implementer rules, and the same audit as any other fable-lite delegation. The runner is `fable-lite-run` (on PATH via the plugin's `bin/`, wrapping `scripts/external-run.sh`); it spawns a nested `claude -p` pointed at the configured endpoint (Ollama's local daemon by default, which uses the user's Ollama sign-in, so no API key is needed).
 
+**Off by default.** The runner refuses unless the config sets `"external": {"enabled": true}`, and it refuses a LOCAL model (served on this machine, e.g. Ollama on localhost without a `:cloud` tag) unless the config also sets `"allowLocalModels": true`. If it refuses, report that to the user and stop: never edit their config to enable it yourself, never start a model server (`ollama serve` / `ollama run`), and never fall back to a local model.
+
 ## If the argument is `list` or empty
 
 Run `fable-lite-models` and show the output. Stop.

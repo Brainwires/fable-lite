@@ -146,11 +146,14 @@ fable-lite can run a phase on a model that is not from Anthropic. Claude Code ha
 
 **Auth.** The default endpoint is the local Ollama daemon (`http://localhost:11434`), which handles cloud models through your `ollama signin` account. No API key is needed, and cloud models take the `:cloud` suffix (`glm-5.3-flash:cloud`). To hit `https://ollama.com` directly instead, set `external.baseUrl` to it and export `OLLAMA_API_KEY`. Any other endpoint that speaks the Anthropic Messages API works the same way with `external.baseUrl` and `external.authToken`.
 
+**Off by default.** External models are never used unless the config says `"enabled": true` under `external`. Local models (a model served by a daemon on this machine, such as Ollama on `localhost` without a `:cloud` tag) are refused even then, unless the config also says `"allowLocalModels": true`. A local model loads into this machine's RAM (a 27B model takes about 18 GB) and can starve everything else running on it, so turn that on only on a machine with the memory to spare. fable-lite never starts a model server itself. One-off overrides for a single shell: `FABLE_LITE_EXTERNAL_ENABLED=1`, `FABLE_LITE_ALLOW_LOCAL_MODELS=1`.
+
 **Configure routes** in `.fable-lite/config.json` (project) or `~/.claude/fable-lite.json` (user). Copy `examples/fable-lite.config.json`:
 
 ```json
 {
   "external": {
+    "enabled": true,
     "baseUrl": "http://localhost:11434",
     "routes": {
       "sonnet": "glm-5.3-flash:cloud",
@@ -160,13 +163,14 @@ fable-lite can run a phase on a model that is not from Anthropic. Claude Code ha
 }
 ```
 
-Routes exist for all four roles: `sonnet`, `opus`, `scout`, and `verifier`. With routes set, `/fable-lite:build`, `/fable-lite:delegate`, and the auto-loaded skill send those roles to the named models, and a PreToolUse hook denies any Agent-tool call for a routed role with a message pointing at `fable-lite-run`. Without routes, nothing changes.
+Routes exist for all four roles: `sonnet`, `opus`, `scout`, and `verifier`. With routes set, `/fable-lite:build`, `/fable-lite:delegate`, and the auto-loaded skill send those roles to the named models, and a PreToolUse hook denies any Agent-tool call for a routed role with a message pointing at `fable-lite-run`. Without `enabled: true` or without routes, nothing changes. A route to a local model is dropped (that role stays on Anthropic subagents) unless `allowLocalModels` is set.
 
 **Strict mode.** Set `"strict": true` under `external` and three PreToolUse hooks enforce the split: the Agent tool is denied, Edit/Write to **project code** are denied, and test/build/lint/install runs plus code-writing Bash (heredocs, `sed -i`, `tee`, `cp`, `mv`, `patch`, `git apply`) are denied. "Project code" means files inside the project tree except under `.fable-lite/`; writes outside the project tree (the plans dir, the scratchpad, `~/.claude`, `/tmp`) are orchestration and stay allowed, so plan mode and note-taking still work. The Bash write-guard is fail-closed: a write-shaped command whose target can't be resolved is denied. The Claude session then does nothing but orchestrate and audit: it understands the request, writes briefs, reads diffs, and reports. Every delegated task, including read-only scouting and test runs, executes on the external models. Strict does not block read-only research agents (`claude-code-guide`, `Explore`, `Plan`, or any name in `external.strictAgentAllow`) — those need web or Anthropic-only tools an external model lacks, and blocking them would just push the reading onto the orchestrator. The escape hatch is a marker file: `echo reason > .fable-lite/takeover` lifts every strict guard — edits, Bash, and the Agent tool — until it is removed. Put the config at `~/.claude/fable-lite.json` to make this the default for every project:
 
 ```json
 {
   "external": {
+    "enabled": true,
     "strict": true,
     "routes": {
       "sonnet": "glm-5.3-flash:cloud",

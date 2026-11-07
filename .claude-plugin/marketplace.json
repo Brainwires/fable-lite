@@ -9,7 +9,7 @@
     {
       "name": "fable-lite",
       "description": "Orchestrate on Opus, spend Fable only where it counts. Keeps planning, judgment calls, and auditing on the Opus session while routing implementation to Sonnet and Opus subagents by complexity — and up to Fable for the hardest phases.",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "author": {
         "name": "Brainwires"
       },

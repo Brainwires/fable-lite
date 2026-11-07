@@ -96,6 +96,10 @@ if [ -z "$TOKEN" ]; then
     *) TOKEN="ollama";;
   esac
 fi
+# --- policy: external models OFF by default; local (this-machine) models also need allowLocalModels
+POLICY_CFG="-"; for f in "$RUN_CWD/.fable-lite/config.json" "$HOME/.claude/fable-lite.json"; do [ -f "$f" ] && { POLICY_CFG="$f"; break; }; done
+python3 "$PLUGIN_ROOT/scripts/external-policy.py" check "$POLICY_CFG" "$MODEL" "$BASE_URL" || exit 3
+
 [ -n "$TOKEN" ] || { echo "external-run: no auth token. For ollama.com set OLLAMA_API_KEY; for a local daemon any value works." >&2; exit 3; }
 
 # --- role → agent rules + default tools

@@ -6,9 +6,9 @@ echo "## Endpoint: $BASE_URL"
 if curl -s -m 3 "$BASE_URL/api/version" >/dev/null 2>&1; then
   echo "reachable: yes ($(curl -s -m 3 "$BASE_URL/api/version" | tr -d '\n'))"
 else
-  echo "reachable: NO. Start it with: ollama serve   (or set FABLE_LITE_EXTERNAL_BASE_URL)"
+  echo "reachable: no (fable-lite never starts a model server; local models are off by default)"
 fi
-echo; echo "## Local models"; ollama list 2>/dev/null | tail -n +2 | awk '{print "- "$1"  ("$3" "$4")"}' || echo "(ollama CLI not found)"
+echo; echo "## Local models (OFF by default: need external.enabled + external.allowLocalModels; they load into this machine's RAM)"; ollama list 2>/dev/null | tail -n +2 | awk '{print "- "$1"  ("$3" "$4")"}' || echo "(ollama CLI not found)"
 echo; echo "## Cloud models (use with :cloud suffix through the local daemon, plain name against https://ollama.com)"
 curl -s -m 8 https://ollama.com/api/tags 2>/dev/null | python3 -c "
 import sys,json

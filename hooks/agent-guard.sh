@@ -21,17 +21,21 @@ fl_load_config
 [ -n "$FL_CFG" ] || exit 0
 [ "$FL_TAKEOVER" = 1 ] && exit 0           # takeover lifts the agent guard too
 
-FABLE_LITE_HOOK_INPUT="$input" python3 - "$FL_CFG" <<'PY'
+FABLE_LITE_HOOK_INPUT="$input" python3 - "$FL_CFG" "$(dirname "${BASH_SOURCE[0]}")/../scripts/external-policy.py" <<'PY'
 import json, os, sys
 cfg_path = sys.argv[1]
 try:
     call = json.loads(os.environ.get("FABLE_LITE_HOOK_INPUT") or "{}")
     ext = json.load(open(cfg_path)).get("external", {})
+    import subprocess
+    eff = json.loads(subprocess.run([sys.executable, sys.argv[2], "routes", cfg_path],
+                                    capture_output=True, text=True).stdout or "{}")
 except Exception:
     sys.exit(0)
 
-routes = ext.get("routes") or {}
-strict = bool(ext.get("strict"))
+# external routes are OFF unless external.enabled; local models are dropped unless allowLocalModels
+routes = eff.get("routes") or {}
+strict = bool(eff.get("strict"))
 sub = str((call.get("tool_input") or {}).get("subagent_type") or "")
 name = sub.split(":")[-1]
 

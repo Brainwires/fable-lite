@@ -9,7 +9,8 @@ fl_load_config() {
     [ -f "$f" ] && { FL_CFG="$f"; break; }
   done
   [ -n "$FL_CFG" ] || return 0
-  FL_STRICT=$(python3 -c 'import json,sys; print(1 if json.load(open(sys.argv[1])).get("external",{}).get("strict") else 0)' "$FL_CFG" 2>/dev/null || echo 0)
+  # strict counts only when external routes are enabled (external.enabled) and at least one route is allowed
+  FL_STRICT=$(python3 -c 'import json,subprocess,sys; e=json.loads(subprocess.run([sys.executable,sys.argv[2],"routes",sys.argv[1]],capture_output=True,text=True).stdout or "{}"); print(1 if e.get("strict") else 0)' "$FL_CFG" "$(dirname "${BASH_SOURCE[0]}")/../scripts/external-policy.py" 2>/dev/null || echo 0)
   [ -f "$FL_PROOT/.fable-lite/takeover" ] && FL_TAKEOVER=1
   return 0
 }

@@ -1,5 +1,7 @@
 {
   "external": {
+    "enabled": true,
+    "allowLocalModels": false,
     "baseUrl": "http://localhost:11434",
     "authToken": "ollama",
     "strict": false,

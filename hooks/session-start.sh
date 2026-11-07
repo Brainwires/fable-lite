@@ -14,12 +14,12 @@ MSG
 # External routes: project config first, then user config.
 for cfg in "${CLAUDE_PROJECT_DIR:-$PWD}/.fable-lite/config.json" "$HOME/.claude/fable-lite.json"; do
   [ -f "$cfg" ] || continue
-  routes=$(python3 - "$cfg" <<'PY' 2>/dev/null
-import json,sys
-d=json.load(open(sys.argv[1])).get("external",{})
-r=d.get("routes") or {}
+  routes=$(python3 - "$cfg" "$(dirname "${BASH_SOURCE[0]}")/../scripts/external-policy.py" <<'PY' 2>/dev/null
+import json,subprocess,sys
+e=json.loads(subprocess.run([sys.executable,sys.argv[2],"routes",sys.argv[1]],capture_output=True,text=True).stdout or "{}")
+r=e.get("routes") or {}
 if r:
-    print(("STRICT " if d.get("strict") else "") + "; ".join(f"{tier} -> {model}" for tier,model in r.items()))
+    print(("STRICT " if e.get("strict") else "") + "; ".join(f"{tier} -> {model}" for tier,model in r.items()))
 PY
 )
   if [ -n "$routes" ]; then
